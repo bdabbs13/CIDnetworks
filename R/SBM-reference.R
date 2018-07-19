@@ -195,27 +195,28 @@ SBMcid <-
 
                 if (verbose>1) print(b.memb)
 
-                get_log_posterior <- function(gg){
-                    b.memb[ii] <- gg
-                    sender_node <-  b.memb[edge.list[edge.list.rows[[ii]], 1]]
-                    receiver_node <- b.memb[edge.list[edge.list.rows[[ii]], 2]] - 1
+                get_log_posterior <- function(gg, node){
+                    b.memb[node] <- gg
+                    ## BD: We don't need to calcula te the likelihood for all edges, just the ones
+                    sender_node <-  b.memb[edge.list[edge.list.rows[[node]], 1]]
+                    receiver_node <- b.memb[edge.list[edge.list.rows[[node]], 2]] - 1
                     piece <- block.matrix[sender_node + receiver_node * n.groups]
 
-                    log_prior <- log(membership.a[ii,gg])
-                    log_likelihood <- sum(dnorm(outcome[edge.list.rows[[ii]]],
+                    log_prior <- log(membership.a[node,gg])
+                    log_likelihood <- sum(dnorm(outcome[edge.list.rows[[node]]],
                                                 piece, sqrt(residual.variance), log=TRUE))
                     log_posterior <- log_prior + log_likelihood
 
-                    return log_posterior
+                    return(log_posterior)
 
                 }
 
-                ## Note 2014-12-05: If a move empties a class, disallow it. -AT
-                for (ii in sample(1:n.nodes)){
-                    if (any(b.memb[-ii] == b.memb[ii])){
-                        log.pp.vec <- sapply(1:n.groups, get_log_posterior)
-                        log.pp.vec <- log.pp.vec - max(log.pp.vec)
-                        b.memb[ii] <- sample (1:n.groups, 1, prob=exp(log.pp.vec))
+                for (node in sample(1:n.nodes)){
+                    ## Note 2014-12-05: If a move empties a class, disallow it. -AT
+                    if (any(b.memb[-node] == b.memb[node])){
+                        log.pp.vec <- sapply(1:n.groups, get_log_posterior, node=node)
+                        log.pp.vec <- log.pp.vec - max(log.pp.vec) # Handling Underflow
+                        b.memb[node] <- sample (1:n.groups, 1, prob=exp(log.pp.vec))
                     }
                 }
                 if (verbose>1) print(b.memb)
@@ -244,35 +245,34 @@ SBMcid <-
 
                                 likelihood_piece <- sum(outcome[picks]) / residual.variance
                                 prior_piece <- (block.matrix.m[ss,rr] / block.matrix.v[ss,rr])
-                                mean.b <- var.b * (likelihood_piece+ prior_piece)
-                                ## mean.b <- var.b*(sum(outcome[picks]) / residual.variance + block.matrix.m[ss,rr]/
-                                block.matrix.v[ss,rr])
+                                mean.b <- var.b * (likelihood_piece + prior_piece)
+                                ## mean.b <- var.b*(sum(outcome[picks]) / residual.variance + block.matrix.m[ss,rr]/block.matrix.v[ss,rr])
 
-                        }else{
-                            var.b <- 0.5^2; mean.b <- 0
+                            }else{
+                                var.b <- 0.5^2; mean.b <- 0
+                            }
                         }
                     }
-                }
 
-                if (!strong.block) {
-                    output <- rnorm(1, mean.b, sqrt(var.b))
-                } else {
-                    if (ss == rr) {
-                        pivot <- max (c(block.matrix[ss, -ss],
-                                        block.matrix[-ss, ss]))
-                        output <- rtnorm(1, mean.b, sqrt(var.b),
-                                         lower=pivot)
+                    if (!strong.block) {
+                        output <- rnorm(1, mean.b, sqrt(var.b))
                     } else {
-                        pivot <- min (c(block.matrix[ss, ss],
-                                        block.matrix[rr, rr]))
-                        output <- rtnorm(1, mean.b, sqrt(var.b),
-                                         upper=pivot)
+                        if (ss == rr) {
+                            pivot <- max (c(block.matrix[ss, -ss],
+                                            block.matrix[-ss, ss]))
+                            output <- rtnorm(1, mean.b, sqrt(var.b),
+                                             lower=pivot)
+                        } else {
+                            pivot <- min (c(block.matrix[ss, ss],
+                                            block.matrix[rr, rr]))
+                            output <- rtnorm(1, mean.b, sqrt(var.b),
+                                             upper=pivot)
+                        }
                     }
+
+                    block.matrix[ss,rr] <<- output
+                    if (symmetric.b) block.matrix[rr,ss] <<- output
                 }
-
-                block.matrix[ss,rr] <<- output
-                if (symmetric.b) block.matrix[rr,ss] <<- output
-
                 rotate()
             },
 
@@ -285,7 +285,7 @@ SBMcid <-
                     index <- (kk-burnin)/thin
                     if (kk > burnin & round(index)==index) {
                         out[[index]] <- c(pieces(), list(log.likelihood=log.likelihood()))
-                        if (report.interval > 0) && (index %% report.interval == 0){
+                        if ((report.interval > 0) && (index %% report.interval == 0)){
                             message("SBM ",index)
                         }
                     }
