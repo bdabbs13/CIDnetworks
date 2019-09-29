@@ -114,55 +114,32 @@ CIDnetwork <-
 
                 if (int.correlation != 0) include.reciprocity <- TRUE
 
-###        if (!missing(sociomatrix)) {
-###          if (!(class(sociomatrix) %in% c("array", "matrix", "data.frame"))) stop ("Sociomatrix must be a matrix or two-dimensional array.")
-###          if (nrow(sociomatrix) != ncol(sociomatrix)) stop ("Sociomatrix must be square.")
-###          new.nodes <- nrow(sociomatrix)
-###          .self$n.nodes <<- new.nodes
-###
-###          if (missing(is.directed)) {
-###            if (all(t(sociomatrix) == sociomatrix, na.rm=TRUE)) {
-###              message ("Auto-detected a symmetric sociomatrix; assuming this is an undirected network.")
-###              .self$is.directed <<- FALSE
-###            } else {
-###              message ("Auto-detected an asymmetric sociomatrix; assuming this is a directed network.")
-###              .self$is.directed <<- TRUE
-###            }
-###          } else .self$is.directed <<- is.directed
-###
-###
-###          if (!.self$is.directed) {
-###            .self$edge.list <<- make.edge.list (new.nodes)
-###            .self$outcome <<- sociomatrix[l.diag(new.nodes)]
-###          } else {
-###            .self$edge.list <<- make.arc.list (new.nodes)
-###            .self$outcome <<- t(sociomatrix)[non.diag(new.nodes)]   #note: arc list changes receiver first, so it's row-based.
-###          }
-###
-###        } else {
                 if (missing(edge.list)) {
-                    if (missing(n.nodes)) stop ("CIDnetwork: Not detected: n.nodes, edge.list, or sociomatrix") else {
-                                                                                                                    .self$n.nodes <<- n.nodes
-                                                                                                                    if (!missing(is.directed))
-                                                                                                                        .self$is.directed <<- is.directed
-                                                                                                                    else {
-                                                                                                                        .self$is.directed <<- include.reciprocity | (int.correlation != 0)
-                                                                                                                        if(verbose > 0){
-                                                                                                                            if (.self$is.directed)
-                                                                                                                                message ("CIDnetwork: Reciprocity was specified: assuming a DIRECTED network.")
-                                                                                                                            else
-                                                                                                                                message ("CIDnetwork: Directedness was unspecified: assuming an undirected network.")
-                                                                                                                        }
-                                                                                                                    }
+                    if (missing(n.nodes)){
+                        stop ("CIDnetwork: Not detected: n.nodes, edge.list, or sociomatrix")
+                    }else {
 
-                                                                                                                    if (.self$is.directed) {
-                                                                                                                        .self$edge.list <<- make.arc.list (n.nodes)
-                                                                                                                        .self$outcome <<- outcome
-                                                                                                                    } else {
-                                                                                                                        .self$edge.list <<- make.edge.list (n.nodes)
-                                                                                                                        .self$outcome <<- outcome
-                                                                                                                    }
-                                                                                                                }
+                        .self$n.nodes <<- n.nodes
+                        if (!missing(is.directed))
+                            .self$is.directed <<- is.directed
+                        else {
+                            .self$is.directed <<- include.reciprocity | (int.correlation != 0)
+                            if(verbose > 0){
+                                if (.self$is.directed)
+                                    message ("CIDnetwork: Reciprocity was specified: assuming a DIRECTED network.")
+                                else
+                                    message ("CIDnetwork: Directedness was unspecified: assuming an undirected network.")
+                            }
+                        }
+
+                        if (.self$is.directed) {
+                            .self$edge.list <<- make.arc.list (n.nodes)
+                            .self$outcome <<- outcome
+                        } else {
+                            .self$edge.list <<- make.edge.list (n.nodes)
+                            .self$outcome <<- outcome
+                        }
+                    }
                 } else {
                     if (missing(n.nodes))
                         .self$n.nodes <<- max(c(edge.list))
