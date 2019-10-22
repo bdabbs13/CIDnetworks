@@ -167,8 +167,10 @@ COVARIATEcid <-
             }
           }
 
-          if (cov.type == "Sender")
-            covariates <<- covariates[edge.list[,1],,drop=FALSE]
+          if (cov.type == "Sender"){
+              print(covariates)
+              covariates <<- covariates[edge.list[,1],,drop=FALSE]
+          }
 
           if (cov.type == "Receiver")
             covariates <<- covariates[edge.list[,2],,drop=FALSE]
