@@ -424,7 +424,7 @@ CIDnetwork <-
                 if(any(is.na(outcome))){
                     io.temp <- int.outcome
                     io.temp[is.na(outcome)] <- rnorm(sum(is.na(outcome)),
-                                                     value.hold,1)
+                                                     value.hold[is.na(outcome)],1)
                     int.outcome <<- io.temp
 
                 }
