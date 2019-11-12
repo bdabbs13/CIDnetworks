@@ -1,0 +1,114 @@
+---
+title: "Fitting SBMs in R"
+author: "Dr Tracy Sweet"
+date: "May 2, 2019"
+output: html_document
+---
+
+# Fitting SBMs Using CIDnetworks
+
+## Loading Our Data
+We will go through the example we just saw in the slides
+```{r}
+library(igraph)
+library(CIDnetworks)
+load("samplenet.Rdata")
+
+plot(graph.adjacency(samplenet), vertex.size=12, vertex.frame.color=NA, vertex.color="gold", edge.arrow.size=0.5)
+```
+
+## Fitting a 5 block SBM
+```{r, eval=FALSE}
+## Before we fit the blockmodel, we need to specify a few things
+## We need to specify what we think the mean and variance values would be for the B matrix
+## It's not required but we get better model fits this way
+## The other confusing thing is this is on the probit scale
+M5 <- matrix(-2, 5, 5) 
+diag(M5) <- 0.67
+V5 <- matrix(0.0625, 5, 5)
+diag(V5) <- 0.09
+
+fit5= CID.Gibbs(samplenet, components = c(SBM(5, block.matrix.m = M5, block.matrix.v = V5)), draws = 400, burnin=1000, thin = 20)
+
+summary(fit5)
+plot(fit5)
+
+summary(sbm.mod)[[6]]$modal.membership
+
+est.blocks=summary(fit5)[[6]]$modal.membership
+plot(graph.adjacency(samplenet), vertex.size=12, vertex.frame.color=NA, vertex.color=est.blocks, edge.arrow.size=0.5)
+
+```
+
+## Fitting a 6, 7, or 8 block SBM
+```{r, eval=FALSE}
+M6 <- matrix(-2, 6, 6) 
+diag(M6) <- 0.67
+V6 <- matrix(0.0625, 6, 6)
+diag(V6) <- 0.09
+
+fit6= CID.Gibbs(samplenet, components = c(SBM(6, block.matrix.m = M6, block.matrix.v = V6)), draws = 400, burnin=1000, thin = 20)
+
+summary(fit6)
+plot(fit6)
+
+est.blocks=summary(fit6)[[6]]$modal.membership
+plot(graph.adjacency(samplenet), vertex.size=12, vertex.frame.color=NA, vertex.color=est.blocks, edge.arrow.size=0.5)
+```
+
+
+## Generating our own network data to play with
+```{r}
+## I wrote a function to generate network data for you
+source("GenerateSBM.r")
+
+## The three inputs of this function are
+## n.nodes, n.blocks, bmatrix or vector(diagonal entries, off diagonal entries)
+
+mySBMdata=generateSBMdata(20, 4, c(0.7, 0.1))
+mynetwork=mySBMdata$network
+true.mem=mySBMdata$trueblock
+plot(graph.adjacency(mynetwork), vertex.color=true.mem)
+
+
+## Fitting a SBM
+M4 <- matrix(-2, 4, 4) 
+diag(M4) <- 0.67
+V4 <- matrix(0.0625, 4, 4)
+diag(V4) <- 0.09
+
+mySBM= CID.Gibbs(mynetwork, components = c(SBM(4, block.matrix.m = M4, block.matrix.v = V4)), draws = 400, burnin=1000, thin = 20)
+
+summary(mySBM)
+plot(mySBM)
+
+est.blocks=summary(mySBM)[[6]]$modal.membership
+plot(graph.adjacency(mynetwork), vertex.size=12, vertex.frame.color=NA, vertex.color=est.blocks, edge.arrow.size=0.5)
+```
+
+
+## On Your Own
+```{r, eval=FALSE}
+## Trying this out on your own
+# Generating a network with 30 nodes and 4 blocks
+# Within block probability of a tie is 0.6
+# Between block probability of a tie is 0.05
+simdata=generateSBMdata(30, 4, b=c(0.6, 0.05))
+plot(graph.adjacency(simdata$network), vertex.size=8, vertex.label=NA, vertex.frame.color=NA, vertex.color=simdata$trueblock, edge.arrow.size=0.5)
+
+mynetwork=simdata$network
+
+M4 <- matrix(-2, 4, 4) 
+diag(M4) <- 0.67
+V4 <- matrix(0.0625, 4, 4)
+diag(V4) <- 0.09
+
+mySBM= CID.Gibbs(mynetwork, components = c(SBM(4, block.matrix.m = M4, block.matrix.v = V4)), draws = 400, burnin=1000, thin = 20)
+
+summary(mySBM)
+plot(mySBM)
+
+est.blocks=summary(mySBM)[[6]]$modal.membership
+plot(graph.adjacency(mynetwork), vertex.size=12, vertex.frame.color=NA, vertex.color=est.blocks, edge.arrow.size=0.5)
+
+```

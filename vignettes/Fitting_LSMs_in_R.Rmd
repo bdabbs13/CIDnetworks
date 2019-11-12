@@ -1,0 +1,171 @@
+---
+title: "Fitting LSMs in R"
+author: "Dr Tracy Sweet"
+date: "May 2, 2019"
+output: html_document
+---
+
+We will be using the CIDnetworks R package to fit single network models. There is another R package  that fit latent space models called statnet/latentnet, but we will be using CIDnetworks for several reasons.  First, our goodness of fit code works with CIDnetworks objects.  Second, CIDnetworks is a bit more flexible than statnet in terms of allowing missing data, a wide variety of tie values, and accommodates random sender/receiver effects.
+
+## Loading our network data
+```{r}
+load("School1Advice.Rdata")
+ls()
+## recall network.sch1 is a matrix and network.ties.sch1 is a dataframe
+## We could use network.ties.sch1 but we would only want to use the first 3 columns
+```
+
+
+## Fitting Models in CIDnetworks 
+
+```{r}
+library(CIDnetworks)
+## The first argument is the network; either a sociomatrix or dataframe of tie outcomes is fine
+lsm0 = CID.Gibbs(network.sch1, components = c(LSM(2)), draws=300, thin=10)
+
+## Exploring lsm0
+class(lsm0)
+names(lsm0)
+
+## lsm0$result is a list of 300 draws from the MCMC chain
+## after thinning and burnin
+
+summary(lsm0)
+LSM.plot(lsm0)
+```
+
+### Fitting LSMs with other dimensions
+```{r, eval=FALSE}
+lsm0b=CID.Gibbs(network.sch1, components = c(LSM(3)), draws=300, thin=10)
+lsm0c=CID.Gibbs(network.sch1, components = c(LSM(4)), draws=300, thin=10)
+```
+
+
+### Fitting Covariates in LSM
+```{r}
+## Note for time, we do not thin these models.  
+## When fitting these models in practice, you should thin
+## by at least 10 if not 20.
+lsm1a=CID.Gibbs(network.sch1, components = c(LSM(2), SenderCOV(teachers), ReceiverCOV(teachers)), draws=300)
+summary(lsm1a)
+COV.plot(lsm1a)
+LSM.plot(lsm1a)
+```
+
+Here are some more to try
+```{r, eval=FALSE}
+
+lsm1b=CID.Gibbs(network.sch1, components = c(LSM(2), SenderCOV(teachers), ReceiverCOV(teachers), EdgeCOV(edgevars)), draws=300)
+summary(lsm1b)
+COV.plot(lsm1b)
+LSM.plot(lsm1b)
+
+
+lsm1c=CID.Gibbs(network.sch1, components = c(LSM(2),  EdgeCOV(edgevars)), draws=300)
+summary(lsm1c)
+COV.plot(lsm1c)
+LSM.plot(lsm1c)
+
+lsm1d=CID.Gibbs(network.sch1, components = c(LSM(2),  EdgeCOV(edgevars[,3])), draws=300)
+summary(lsm1d)
+COV.plot(lsm1d)
+LSM.plot(lsm1d)
+
+```
+
+## On Your Own - For Beginners
+There is another dataset that you can use called School2Advice.Rdata.  Fit the following LSM models.
+
+1. A LSM with 2 dimensions
+2. A LSM with 3 dimensions
+3. A LSM with 2 dimensions and sender covariates 
+4. A LSM with 2 dimensions and receiver covariates
+5. A LSM with 2 dimension and edge covariates
+
+
+```{r, eval=FALSE}
+## Solutions
+load("School2Advice.Rdata")
+ls()
+
+head(teachers2)
+head(edgevars2)
+head(sch2net)
+
+## Plotting the Network
+par(mar=c(0,0,0,0))
+plot.igraph(graph.adjacency(sch2net), layout = layout.fruchterman.reingold, vertex.color = "gold", vertex.label=NA, vertex.size =5, edge.arrow.size=0.25, edge.arrow.width=0.25, edge.width=0.3, vertex.frame.color=NA,
+frame = TRUE)
+
+##
+fit1=CID.Gibbs(sch2net, components = c(LSM(2)), draws=300)
+fit2=CID.Gibbs(sch2net, components = c(LSM(3)), draws=300)
+fit3=CID.Gibbs(sch2net, components = c(LSM(2), SenderCOV(teachers2)), draws=300)
+fit4=CID.Gibbs(sch2net, components = c(LSM(2), ReceiverCOV(teachers2)), draws=300)
+fit5=CID.Gibbs(sch2net, components = c(LSM(2), EdgeCOV(edgevars2)), draws=300)
+
+```
+
+
+
+## On Your Own - For Advanced Users
+Here is another data set to play with on your own.  These are friendship network data from van de Bunt (1999).  These come from a longitudinal study of university students.  We will be examining data from the 5th time point and looking specifically at network 1, "real friends", see \url{http://www.stats.ox.ac.uk/~snijders/siena/vdBunt_data.htm}
+
+Information about the students was also collected; gender (1=female), program (2-, 3-, or 4- year), and smoking (1=yes).
+
+The R code is below, but try fitting one, two, or all of the following models with 300 samples:
+
+1. A LSM with 2 dimensions
+2. A LSM with 2 dimensions and a sender covariate for the smoking
+3. A LSM with 2 dimensions and an identical covariate for all three variables
+4. A LSM with 3 dimensions and an identical covariate for smoking
+5. A LSM with 3 dimensions and a sender covariate for gender and an identical covariate for smoking
+
+
+The R Code below has some exploratory network stuff along with the 5 models specified above.  Scroll down to see the solutions.
+```{r, eval=FALSE}
+library(igraph)
+library(CIDnetworks)
+load("OnYourOwn.Rdata")
+
+## let's examine the friendship network
+# Note the network and node attributes are both matrices
+class(friends.net.5)
+class(features)
+
+head(friends.net.5)
+head(features)
+
+## One thing to note is that this network has
+## MISSING data!
+## This is actually one cool think about the
+## CIDnetworks package - it handles missing data
+
+## Some random useful code
+## To change nodes to a specific color quickly
+smokecolor = as.character(features[, "Smoking"]) 
+smokecolor = gsub("0", "red", smokecolor) 
+smokecolor = gsub("1", "blue", smokecolor)
+
+par(mar=c(0,0,2,0))
+plot.igraph(graph.adjacency(friends.net.5), layout = layout.fruchterman.reingold, vertex.color = smokecolor, vertex.label=NA, vertex.size =5, edge.arrow.size=0.25, edge.arrow.width=0.25, edge.width=0.3, vertex.frame.color=NA, main = "Smoking (Red =Yes, Blue=No)",
+frame = TRUE)
+
+```
+
+
+
+```{r, eval=FALSE}
+## Solutions
+fit1=CID.Gibbs(friends.net.5, components = c(LSM(2)), draws=300)
+
+fit2=CID.Gibbs(friends.net.5, components = c(LSM(2), SenderCOV(features[,3])), draws=300)
+
+fit3= CID.Gibbs(friends.net.5, components = c(LSM(2), IdenticalCOV(features)), draws=300)
+
+fit4= CID.Gibbs(friends.net.5, components = c(LSM(3), IdenticalCOV(features[,3])), draws=300)
+
+fit5=CID.Gibbs(friends.net.5, components = c(LSM(3), SenderCOV(features[,1]), IdenticalCOV(features[,3])), draws=300)
+
+```
+
