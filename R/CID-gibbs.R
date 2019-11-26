@@ -543,11 +543,12 @@ CIDnetwork <-
 
             draw.intercept = function (verbose=2) {
 
-                outcomeresid <- int.outcome - rem.values(0);
-                varpiece <- solve(nrow(edge.list)/residual.variance + 1/intercept.v)
-                meanpiece <- varpiece*(sum(outcomeresid)/residual.variance + intercept.m/intercept.v)
-                if (verbose > 2) message ("Intercept ",meanpiece," ",sqrt(varpiece))
-                intercept <<- rnorm(1, meanpiece, sqrt(varpiece))
+                # outcomeresid <- int.outcome - rem.values(0);
+                # varpiece <- solve(nrow(edge.list)/residual.variance + 1/intercept.v)
+                # meanpiece <- varpiece*(sum(outcomeresid)/residual.variance + intercept.m/intercept.v)
+                # if (verbose > 2) message ("Intercept ",meanpiece," ",sqrt(varpiece))
+                # intercept <<- rnorm(1, meanpiece, sqrt(varpiece))
+                intercept <<- 0
 
             },
 
