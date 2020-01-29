@@ -50,18 +50,18 @@ LSMcid$methods(
                         tune = 0.1,
                         inverted.model = FALSE,
                         generate = FALSE) {
-    n.nodes <<- n.nodes
-    edge.list <<- edge.list
-    edge.list.rows <<- edge.list.rows
-    residual.variance <<- residual.variance
-    node.names <<- as.character(1:n.nodes)
-    dimension <<- dimension
-    latent.space.pos <<- latent.space.pos
-    latent.space.pos.m <<- latent.space.pos.m
-    latent.space.pos.v <<- latent.space.pos.v
-    latent.space.pos.v.ab <<- latent.space.pos.v.ab
-    mult.factor <<- 2 * inverted.model - 1
-    tune <<- tune
+    .self$n.nodes <<- n.nodes
+    .self$edge.list <<- edge.list
+    .self$edge.list.rows <<- edge.list.rows
+    .self$residual.variance <<- residual.variance
+    .self$node.names <<- as.character(1:n.nodes)
+    .self$dimension <<- dimension
+    .self$latent.space.pos <<- latent.space.pos
+    .self$latent.space.pos.m <<- latent.space.pos.m
+    .self$latent.space.pos.v <<- latent.space.pos.v
+    .self$latent.space.pos.v.ab <<- latent.space.pos.v.ab
+    .self$mult.factor <<- 2 * inverted.model - 1
+    .self$tune <<- tune
 
     if (generate) {
       outcome <<- rnorm(nrow(edge.list), value(), sqrt(residual.variance))
@@ -91,6 +91,12 @@ LSMcid$methods(
     #        latent.space.pos.v rather than mult.factor (which is in position 3)
     parameters[[2]] * edge.list.distance(parameters[[1]], rbind(edge.list[edges, ]))
   },
+  random.start = function() {
+    "Generates a random latent positions to initiate the MCMC sampling. Places
+    Them in the correct object field."
+    latent.space.pos <<- matrix(rnorm(dimension * n.nodes, 0, sqrt(latent.space.pos.v)), nrow = n.nodes)
+    latent.space.target <<- latent.space.pos
+  },
   log.likelihood = function(parameters = pieces(),
                             edges = 1:nrow(edge.list)) {
     "Computes log-likelihood of outcome given with the mean being predicted by
@@ -118,12 +124,6 @@ LSMcid$methods(
     "Plots the edge.list as a network. color argument is a numeric vector
     that controls the node color."
     image.netplot(edge.list, color, node.labels = node.names, ...)
-  },
-  random.start = function() {
-    "Generates a random latent positions to initiate the MCMC sampling. Places
-    Them in the correct object field."
-    latent.space.pos <<- matrix(rnorm(dimension * n.nodes, 0, sqrt(latent.space.pos.v)), nrow = n.nodes)
-    latent.space.target <<- latent.space.pos
   },
   draw = function(verbose = 0, mh.tune = tune, langevin.mode = FALSE) {
     "Computes every step for each MCMC draw. MH step for latent space positions,
