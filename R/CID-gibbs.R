@@ -378,10 +378,7 @@ CIDnetwork$methods(
     
     summary = function() show(),
     
-    
     generate = function() {
-        
-        # Built 5-21-14. Tested: ----
         if (reciprocity.present) {
             int.deviation <- matrix(rnorm(2*nrow(edge.list), 0, sqrt(residual.variance)), ncol = 2)
             int.deviation[, 2] <- int.correlation*int.deviation[, 1] + sqrt(1-int.correlation^2)*int.deviation[, 2]
@@ -395,7 +392,6 @@ CIDnetwork$methods(
                                   value(redo = TRUE),
                                   sqrt(residual.variance))
         }
-        
         ## Generate user-observed outcome from intermediate outcome.
         if (class.outcome == "ordinal") {
             temp.out <- 0*int.outcome
@@ -403,18 +399,21 @@ CIDnetwork$methods(
             for (ii in 1:length(ordinal.steps)) temp.out <- temp.out + 1*(int.outcome > ordinal.steps[ii])
             outcome <<- temp.out
         }
-        
-        if (class.outcome == "gaussian") outcome <<- int.outcome
-        
+        if (class.outcome == "gaussian") {
+            outcome <<- int.outcome
+        }
     },
-    
-    
-    rem.values = function(kk) {if (kk>0) value() - comp.values[, kk] else value() - intercept},
-    
+    rem.values = function(kk) {
+        if ( kk>0 ) {
+            return(value() - comp.values[, kk])
+        } else {
+            return(value() - intercept)
+        } 
+    },
     update.comp.values = function() {
-        if (length(components)>0){
+        if ( length(components) > 0 ) {
             comp.values <<- sapply(components, function(cc) cc$value())
-        }else{
+        } else {
             comp.values <<- matrix(0, nrow = nrow(edge.list))
         }
     },
@@ -500,17 +499,13 @@ CIDnetwork$methods(
             
         }
     },
-    
-    
-    
-    ## Simple slice sampler for autocorrelation term \rho. Pretty optimized! Act, 6-3-14
     int.correlation.prior = function(pp = int.correlation) {
+        ## Simple slice sampler for autocorrelation term \rho. Pretty optimized! Act, 6-3-14
         dbeta((1+pp)/2,  int.correlation.ab[1], int.correlation.ab[2], log = TRUE) - log(2)
     },
     
-    #Note: this is being drawn from the main likelihood, not the intermediate likelihood, because it's more efficient for the whole chain.
     draw.int.correlation = function() {
-        
+        #Note: this is being drawn from the main likelihood, not the intermediate likelihood, because it's more efficient for the whole chain.
         these.pieces <- pieces()
         current.value <- int.correlation
         
@@ -597,13 +592,17 @@ CIDnetwork$methods(
             # first: unmatched edges.
             if (reciprocity.present) {
                 picks <- which(is.na(reciprocal.match.na))
-                output[picks] <- log(
-                    pnorm(breakers.upper[picks],
-                          value.this[picks],
-                          sqrt(pieces.this$residual.variance)) -
-                        pnorm(breakers.lower[picks],
-                              value.this[picks],
-                              sqrt(pieces.this$residual.variance)))
+                upper <- pnorm(
+                    breakers.upper[picks],
+                    value.this[picks],
+                    sqrt(pieces.this$residual.variance)
+                )
+                lower <- pnorm(
+                    breakers.lower[picks],
+                    value.this[picks],
+                    sqrt(pieces.this$residual.variance)
+                )
+                output[picks] <- log(upper - lower)
                 
                 ## now, matched edges.  BD added !is.na(outcome)
                 picks2 <- which(!is.na(reciprocal.match.na) & edge.list[!is.na(outcome), 1] < edge.list[!is.na(outcome), 2])
@@ -614,13 +613,6 @@ CIDnetwork$methods(
                                              meanval = matrix(value.this[c(picks2, reciprocal.match.na[picks2])], ncol = 2),
                                              sigma = pieces.this$residual.variance,
                                              rho = pieces.this$int.correlation)
-                
-                #this.output <- sapply(picks2, function(pp) {
-                #  pmvnorm(breakers.lower[c(pp, reciprocal.match.na[pp])],
-                #          breakers.upper[c(pp, reciprocal.match.na[pp])],
-                #           mean = value.this[c(pp, reciprocal.match.na[pp])],
-                #           sigma = pieces.this$residual.variance*matrix(c(1, pieces.this$int.correlation, pieces.this$int.correlation, 1), nrow = 2))})
-                #output[picks2] <- log(this.output)
                 
             } else {
                 
@@ -854,26 +846,25 @@ CIDnetwork$methods(
         }else{
             ordinal.cuts.mean <- ordinal.cutoffs
         }
-        
-        mean.object <- CID(edge.list, outcome,
-                           intercept = intercept.mean,
-                           components = components.mean,
-                           intercept.m = intercept.m, intercept.v = intercept.v,
-                           residual.variance = residual.variance,
-                           residual.variance.ab = residual.variance.ab,
-                           #ordinal.count = ordinal.count,
-                           class.outcome = class.outcome,
-                           ordinal.cutoffs = ordinal.cuts.mean,
-                           int.correlation = int.correlation,
-                           int.correlation.ab = int.correlation.ab,
-                           include.reciprocity = reciprocity.present,
-                           reinit = FALSE,
-                           verbose = 0)
+        # changed to feed into CIDnetwork as no input checking needs to be
+        # done at this point
+        mean.object <- CIDnetwork(edge.list, outcome,
+                                  intercept = intercept.mean,
+                                  components = components.mean,
+                                  intercept.m = intercept.m,
+                                  intercept.v = intercept.v,
+                                  residual.variance = residual.variance,
+                                  residual.variance.ab = residual.variance.ab,
+                                  class.outcome = class.outcome,
+                                  ordinal.cutoffs = ordinal.cuts.mean,
+                                  int.correlation = int.correlation,
+                                  int.correlation.ab = int.correlation.ab,
+                                  include.reciprocity = reciprocity.present,
+                                  reinit = FALSE,
+                                  verbose = 0)
         mean.object$update.log.likelihood()
         mean.object$update.comp.values()
         return(mean.object)
-        
-        
     },
     
     
@@ -1032,7 +1023,7 @@ CIDnetwork$methods(
         if (length(components) > 0){
             cov.count <- 0
             for (cc in 1:length(components)) {
-                ##		message("Component ", class(components[[cc]]),":")
+                ##    message("Component ", class(components[[cc]]),":")
                 ix <- which(names(gibbs.sum) == class(components[[cc]]))
                 if(length(ix) > 1){
                     cov.count <- cov.count + 1
@@ -1042,7 +1033,7 @@ CIDnetwork$methods(
                     components[[cc]]$print.gibbs.summary(gibbs.sum[[ix]])
                 }
                 
-                #		print(round(gibbs.sum$class(components[[cc]])), 3)
+                #    print(round(gibbs.sum$class(components[[cc]])), 3)
             }
         }
         return()#invisible(gibbs.sum))
@@ -1157,8 +1148,151 @@ CIDnetwork$methods(
                                         #CID <- function(...) CIDnetwork$new(...)
 CID.generate <- function(...) CID(..., generate = TRUE)
 
+CID <- function(input,    # Must be sociomatrix
+                components = list(),
+                node.names,
+                class.outcome = "ordinal",
+                intercept = 0,
+                verbose = 2,
+                ...) {
+    
+    # Removed fill missing edges because the input is now a socimatrix
+    # Removed "generate" feature because we should have a separate object/module
+    # for simulating from the objects if we really want it.
+    
+    # Checks if input exists
+    # Input exists, checks that is must be matrix
+    # Creates edge list, nnodes, outcome from sociomatrix
+    if (missing(input)) {
+        stop("CID: No input was provided.")
+    } else if (is.matrix(input)) {
+        sociomatrix <- input
+        if (nrow(sociomatrix) != ncol(sociomatrix)) {
+            stop("CID: The provided sociomatrix is not square.")
+        }
+    } else {
+        stop("CID: Input must be a symmetric sociomatrix.")
+    }
+    
+    n.nodes <- nrow(sociomatrix)
+    is.directed <- !isSymmetric(sociomatrix)
+    if (is.directed) {
+        edge.list <- make.arc.list(n.nodes)
+        outcome <- t(sociomatrix)[non.diag(n.nodes)]
+    } else {
+        edge.list <- make.edge.list(n.nodes)
+        outcome <- sociomatrix[u.diag(n.nodes)]
+    }
+    
+    if (missing(node.names)) {
+        node.names <- seq_len(n.nodes)
+    } else if (length(node.names) != n.nodes) {
+        stop("CID: node.names must be of length n.nodes.")
+    }
+    
+    ordinal.count <- max(outcome, na.rm = TRUE) + 1
+    if (class.outcome == "ordinal") {
+        if (all(floor(outcome) == outcome, na.rm = TRUE)) {
+            if(verbose > 1) {
+                message("Fitting: ordinal outcome with ", ordinal.count,
+                        " states.")
+            }
+        } else {
+            # added a stop clause, we shouldn't force the outcome class
+            # to something the user did not choose.
+            stop("Detected non-integer values for outcomes. Please specify ",
+                 "that the outcome is 'guassian' or fix the non-integer ",
+                 "outcome values.")
+        }
+    } else {
+        if (verbose > 1) {
+            message("Fitting: Gaussian outcome.")
+        }
+    }
+    CID.object <- CIDnetwork$new(edge.list, n.nodes = n.nodes,
+                                 is.directed = is.directed,
+                                 outcome = outcome,
+                                 class.outcome = class.outcome,
+                                 ordinal.count = ordinal.count,
+                                 components = components,
+                                 intercept = intercept,
+                                 node.names = as.character(node.names),
+                                 verbose = verbose, ...)
+    
+    return(CID.object)
+}
 
-CID <- function(input,    # Must be edge.list, sociomatrix, CID.object or CID.Gibbs.object
+CID.Gibbs <- function(input, # Must be CID.object, CID.gibbs.object or socio
+                      node.names,
+                      components = list(),
+                      class.outcome = "ordinal",
+                      new.chain = FALSE,
+                      draws = 100,
+                      burnin = -1,  # burnin = -1 performs auto-burnin.
+                      thin = 10,
+                      report = 100,
+                      auto.converge = FALSE,
+                      extend.max = 10,
+                      extend.count = 100,
+                      verbose = 2,
+                      ...) {
+    
+    # initializes empty results object. enables us to append new chain to
+    # previously sampled CID.Gibbs obejct
+    res <- c()
+    if (is(input,"CID.Gibbs")) {
+        if (!missing(components)) warning("You cannot change the components of a CID.Gibbs object. Call this using the appropriate CID object if you wish to change the components.")
+        CID.Gibbs.object <- input
+        CID.object <- CID.Gibbs.object$CID.object
+        # CTM NOTE: I feel like this feature is a little non-intuitive.
+        #           If the user wants to extend a chain, they are given
+        #           an brand new object with the full extended chain of samples.
+        #           What is to be done with the old object with the incomplete
+        #           chain? Seems like this would take up a lot of memory
+        #           Would a better feature be to have an `extend` method on the 
+        #           object?
+        #  Concatenating Chains
+        if (!new.chain) {
+            res <- c(res, CID.Gibbs.object$results)
+        }
+    } else if (is(input,"CIDnetwork")) {
+        CID.object <- input
+        if (!missing(components)) {
+            CID.object$components <- components
+        }
+        CID.object$reinitialize()
+    } else {
+        # has been given sociomatrix
+        CID.object <- CID(input,
+                          components = components,
+                          class.outcome = class.outcome,
+                          node.names = node.names,
+                          verbose = verbose, ...)
+    }
+    
+    # run the gibbs sampler and return a completed chain.
+    # if res is nonempty, appends the new chain to the previous results
+    res <- c(res, CID.object$gibbs.full(draws = draws, burnin = burnin,
+                                        thin = thin,
+                                        report = report,
+                                        auto.converge = auto.converge,
+                                        extend.max = extend.max,
+                                        extend.count = extend.count,
+                                        verbose = verbose, ...))
+    
+    # finishing up, computing the DIC and creating output object
+    DIC <- CID.object$DIC(res, add.parts = TRUE)
+    output <- list(results = res,
+                   CID.object = CID.object,
+                   CID.mean = CID.object$gibbs.mean(res),
+                   DIC = DIC)
+    class(output) <- "CID.Gibbs"
+    
+    return(output)
+}
+
+
+CID.old <- function(input,    # Must be edge.list, sociomatrix, CID.object or CID.Gibbs.object
                  outcome,  # Only used when input is an edge.list
                  n.nodes,
                  node.names,
@@ -1329,7 +1463,6 @@ CID <- function(input,    # Must be edge.list, sociomatrix, CID.object or CID.Gi
                                      components = components, outcome = outcome,
                                      class.outcome = class.outcome,
                                      ordinal.count = ordinal.count,
-                                        #                                 ordinal.cutoffs = ordinal.cutoffs,
                                      node.names = as.character(node.names),
                                      generate = generate,
                                      verbose = verbose, ...)
@@ -1340,7 +1473,7 @@ CID <- function(input,    # Must be edge.list, sociomatrix, CID.object or CID.Gi
 }
 
 
-CID.Gibbs <- function(input, # Must be edge.list, sociomatrix, CID.object or
+CID.Gibbs.old <- function(input, # Must be edge.list, sociomatrix, CID.object or
                                         # CID.Gibbs.object
                        outcome, # Only used when input is an edge.list
                        node.names,
