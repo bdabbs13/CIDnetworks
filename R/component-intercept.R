@@ -1,10 +1,10 @@
-
 INTERCEPT <- function(intercept.m=0, intercept.v=1000, intercept=0){
   return(InterceptParams$new(intercept, intercept.m, intercept.v))
 }
 
 InterceptParams <- R6Class(
   classname = "InterceptParams",
+  inherit = BaseParams,
   public = list(
     intercept=0,
     intercept.m = 0,
@@ -29,6 +29,7 @@ InterceptParams <- R6Class(
 
 InterceptComponent <- R6Class(
   classname = "InterceptComponent",
+  inherit = BaseComponent,
   public = list(
     intercept=0,
     intercept.m = 0,
