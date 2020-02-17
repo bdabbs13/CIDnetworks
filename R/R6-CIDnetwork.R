@@ -43,7 +43,7 @@ CIDnetwork <- R6Class(
 
       # BD: We should add a test that edge.list and outcome are the same length
       if (missing(is.directed)){
-        is.directed = any(sociomatrix[!is.na(sociomatrix)] != t(sociomatrix)[!is.na(t(sociomatrix))])
+        is.directed = !isSymmetric(sociomatrix)
       }
       
       self$is.directed = is.directed
