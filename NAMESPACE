@@ -1,5 +1,6 @@
 useDynLib(CIDnetworks)
 importFrom(Rcpp, evalCpp)
+importFrom(R6, R6Class)
 importFrom(msm, rtnorm)
 importFrom(mvtnorm, rmvnorm)
 importFrom(mvtnorm, dmvnorm)
@@ -20,35 +21,35 @@ importFrom("stats", "pnorm", "princomp", "quantile", "rbinom",
 #exportMethods()
 
 #exportPattern("^[[:alpha:]]+")
-export (CID, CID.Gibbs, CID.generate, CIDnetwork,
-        EdgeCOV, SenderCOV, ReceiverCOV, SendRecCOV, IdenticalCOV,
-	HBM,LSM,LVM,MMSBM,SBM,SR,BETA,
-
-        unwrap.CID.Gibbs,
-        CID.metric,
+# R6 exports
+export(CIDGibbs, CIDGibbsOutput ,CIDnetwork, INTERCEPT)
+#     	HBM,LSM,LVM,MMSBM,SBM,SR,BETA,
+# 
+#         unwrap.CID.Gibbs,
+#         CID.metric,# 
 
         #list.output.to.matrices,
 
-        likelihood.plot,
-        intercept.plot,
-        COV.plot,
-        LSM.plot,
-        SBM.plot,
-        MMSBM.plot,
-        SR.plot,
+#         likelihood.plot,
+#         intercept.plot,
+#         COV.plot,
+#         LSM.plot,
+#         SBM.plot,
+#         MMSBM.plot,
+#         SR.plot,
 
-        network.plot, sociogram.plot,
+export(network.plot, sociogram.plot)
 
-        n.nodes,edge.list,is.net.directed,net.density,
-        outcome,node.names,
-        inDegree,outDegree,socio,value.mat,value.mat.mean,
-        switcheroo,mat.cov.to.edge.list.cov, ##  add mans for these
+#         n.nodes,edge.list,is.net.directed,net.density,
+#         outcome,node.names,
+#         inDegree,outDegree,socio,value.mat,value.mat.mean,
+#         switcheroo,mat.cov.to.edge.list.cov, ##  add mans for these
 
-        l.diag, u.diag, ordinal.maker,
-        getModeLS)
+#         l.diag, u.diag, ordinal.maker,
+#         getModeLS
 export(post.pred.mat,post.pred.apply,post.pred.mean)
 
-S3method (plot, CID.Gibbs)
-S3method (print, CID.Gibbs)
-S3method (summary, CID.Gibbs)
-S3method (print, summary.CID.Gibbs)
+# S3method (plot, CID.Gibbs)
+# S3method (print, CID.Gibbs)
+# S3method (summary, CID.Gibbs)
+# S3method (print, summary.CID.Gibbs)

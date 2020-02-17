@@ -2,8 +2,8 @@ Package: CIDnetworks
 Type: Package
 Title: Generative Models for Complex Networks with Conditionally
         Independent Dyadic Structure
-Version: 0.8.4
-Date: 2019-02-04
+Version: 0.9.0
+Date: 2020-02-17
 Authors@R: c(person("Samrachana","Adhikari",role="aut"),
 	     person("Beau","Dabbs",email="bdabbs13@gmail.com",role=c("cre","aut")),
 	     person("Brian","Junker",role="aut"),
@@ -13,5 +13,5 @@ Authors@R: c(person("Samrachana","Adhikari",role="aut"),
 Description: Generative models for complex networks with conditionally independent dyadic structure. Now supports directed arcs!
 License: GPL (> 3)
 Depends: R (>= 3.0.0)
-Imports: mvtnorm, msm, methods, Rcpp (>= 0.11.0), igraph, numDeriv, MASS
+Imports: mvtnorm, msm, methods, Rcpp (>= 0.11.0), igraph, numDeriv, MASS, R6
 LinkingTo: Rcpp
