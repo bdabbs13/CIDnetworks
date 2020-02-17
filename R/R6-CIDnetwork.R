@@ -19,7 +19,6 @@ library(R6)
 # unwrap.CID.Gibbs <- function(gibbs.out) list.output.to.matrices(gibbs.out)
 
 
-
 CIDnetwork <- R6Class(
   classname = "CIDnetwork",
   public = list(
@@ -50,6 +49,7 @@ CIDnetwork <- R6Class(
       node.names,
       is.directed,
       outcome.is.continuous=FALSE,
+      intercept=0,
       components = list(),
       # prior parameters
       intercept.m = 0,
@@ -100,6 +100,7 @@ CIDnetwork <- R6Class(
       self$intercept.v <- intercept.v
       self$residual.variance.ab <- residual.variance.ab
 
+      self$intercept = intercept
       ### Loading Components  
       if (class(components) != "list")
         components <- list(components)
@@ -117,33 +118,92 @@ CIDnetwork <- R6Class(
       self$components <- components
       self$update.intermediate.outcome()
     },
-    pieces = function(
-      include.name = FALSE
-    ) {
-      if (length(self$components)>0) {
-        c(
-          list(
-            intercept = self$intercept,
-            residual.variance = self$residual.variance,
-            log.likelihood = self$log.likelihood,
-            ordinal.cutoffs = self$ordinal.cutoffs,
-            int.correlation = self$int.correlation
-          ),
-          lapply(self$components, function(cc) cc$pieces(include.name))
-          )
-      } else {
-        list(
-          intercept = self$intercept,
-          residual.variance = self$residual.variance,
-          log.likelihood = self$log.likelihood,
-          ordinal.cutoffs = self$ordinal.cutoffs,
-          int.correlation = self$int.correlation
-        )
+    
+    get.sociomatrix = function(){
+      n = self$n.nodes
+      socio = array(NA, dim = c(n,n))
+      df = data.frame(self$edge.list, self$outcome)
+      if (self$is.directed){
+        for(i in 1:dim(df)[1]){
+          socio[df[i,1],df[i,2]] = df[i,3]
+        }
+      } else{
+        for(i in 1:dim(df)[1]){
+          socio[df[i,1],df[i,2]] = socio[df[i,2],df[i,1]] =df[i,3]
+        }
       }
-      },
+      return(socio)
+    },
+    
+    update.output.list = function(output.list, draw){
+      output.list$log.likelihood[draw] = self$log.likelihood
+      output.list$residual.variance[draw] = self$residual.variance
+      output.list$intercept[draw] = self$intercept
+      if (length(self$components) > 0){
+        for (kk in self$components){
+          self$components[kk]$update.output.list(output.list, draw)
+        }
+      }
+    },
+    
+    get.mean.CIDnetwork = function(gibbs.output.list){
+
+      intercept.mean <- mean(gibbs.output.list$intercept)
+      mean.components = list()
+      if(length(components) > 0){
+        for(cc in 1:length(components)){
+          mean.components[[cc]] = self$components[[cc]]$get.mean.component(gibbs.output.list)
+        }
+      }
+      
+      CID.mean <- CIDnetwork$new(
+        sociomatrix = self$get.sociomatrix(),
+        node.names = self$node.names,
+        is.directed = self$is.directed,
+        outcome.is.continuous = self$class.outcome == "gaussian",
+        intercept=intercept.mean,
+        components = mean.components,
+        # prior parameters
+        intercept.m = self$intercept.m,
+        intercept.v = self$intercept.v,
+        residual.variance.ab = self$residual.variance.ab,
+        verbose = self$verbose,
+        reinit = FALSE
+        )
+
+      CID.mean$update.log.likelihood()
+      CID.mean$update.comp.values()
+      return(CID.mean)
+    },
+    # pieces = function(
+    #   include.name = FALSE
+    # ) {
+    #   if (length(self$components)>0) {
+    #     c(
+    #       list(
+    #         intercept = self$intercept,
+    #         residual.variance = self$residual.variance,
+    #         log.likelihood = self$log.likelihood,
+    #         ordinal.cutoffs = self$ordinal.cutoffs,
+    #         int.correlation = self$int.correlation
+    #       ),
+    #       lapply(self$components, function(cc) cc$pieces(include.name))
+    #       )
+    #   } else {
+    #     list(
+    #       intercept = self$intercept,
+    #       residual.variance = self$residual.variance,
+    #       log.likelihood = self$log.likelihood,
+    #       ordinal.cutoffs = self$ordinal.cutoffs,
+    #       int.correlation = self$int.correlation
+    #     )
+    #   }
+    #   },
+    
     value = function() {
       rowSums(self$comp.values) + self$intercept
     },
+    
     rem.values = function(kk) {
       if (kk>0){
         self$value() - self$comp.values[, kk]
@@ -151,11 +211,13 @@ CIDnetwork <- R6Class(
         self$value() - self$intercept
       }
     },
+    
     update.comp.values = function() {
       if (length(self$components)>0){
         self$comp.values <- sapply(self$components, function(cc) cc$value())
       }
     },
+    
     ## Update Z_ij.
     update.intermediate.outcome = function() {
       # BD: Is this necessary?
@@ -194,28 +256,30 @@ CIDnetwork <- R6Class(
         )
       }
     },
+    
     draw.intercept = function() {
       outcome.residual <- self$intermediate.outcome - self$rem.values(0);
       posterior.variance <- 1 / (nrow(self$edge.list) / self$residual.variance + 1 / self$intercept.v)
       posterior.mean <- posterior.variance * (sum(outcome.residual) / self$residual.variance + self$intercept.m / self$intercept.v)
       self$intercept <- rnorm(1, posterior.mean, sqrt(posterior.variance))
     },
+    
     log.likelihood.by.value = function(value,
-                                       pieces,
+                                       residual.variance,
                                        sumup = TRUE,
                                        use.intermediate = FALSE)
     {
       if (missing(value))
         value = self$value()
-      if (missing(pieces))
-        pieces = self$pieces()
+      if (missing(residual.variance))
+        residual.variance = self$residual.variance
 
       not.missing.indicator = !is.na(self$outcome)      
       cm <- function(pp) matrix(c(1, pp, pp, 1), nrow = 2)
       output <- 0 * self$intermediate.outcome
       if (class.outcome == "gaussian" | use.intermediate) {
         outcomeresid <- self$intermediate.outcome - value
-        output <- dnorm(outcomeresid[not.missing.indicator], 0, sqrt(pieces$residual.variance), log = TRUE)
+        output <- dnorm(outcomeresid[not.missing.indicator], 0, sqrt(residual.variance), log = TRUE)
       } else if (class.outcome == "binary") {
         observed.outcomes = self$outcome[not.missing.indicator]
         observed.values = value[not.missing.indicator]
@@ -231,18 +295,20 @@ CIDnetwork <- R6Class(
         output <- log(
           pnorm(breakers.upper,
                 observed.values,
-                sqrt(pieces$residual.variance)) -
+                sqrt(residual.variance)) -
             pnorm(breakers.lower,
                   observed.values,
-                  sqrt(pieces$residual.variance)))
+                  sqrt(residual.variance)))
       }
       if(sumup) output <- sum(output)
 
       return(output)
     },
+    
     update.log.likelihood = function() {
       self$log.likelihood <- self$log.likelihood.by.value()
     },
+    
     draw.variance = function() {
       outcomeresid <- self$intermediate.outcome - self$value()
   
