@@ -1,8 +1,6 @@
-
 #####################################################################################
 #
 # Gibbs Sampler collection for CID, given the collection of input terms.
-
 #source("COV-reference.R"); source("SBM-reference.R")e; source("LSM-reference.R"); source("SR-reference.R"); library(Rcpp); library(mvtnorm); library(msm); sourceCpp("../src/cid.cpp"); source("CID-basefunctions.R");
 
 .onAttach <- function(...) {
@@ -287,19 +285,19 @@ CIDnetwork$methods(
         }
         update.intermediate.outcome()
     },
-    
+
     reinitialize = function(n.nodes = NULL, edge.list = NULL, node.names = NULL) {
         if (!is.null(n.nodes)) n.nodes <<- n.nodes
         if (!is.null(edge.list)) {
             edge.list <<- edge.list
             edge.list.rows <<- row.list.maker(edge.list)
         }
-        
+
         if (!is.null(node.names)) {
             if (length(node.names) == .self$n.nodes) node.names <<- node.names
         } else node.names <<- as.character(1:.self$n.nodes)
-        
-        
+
+
         if (length(components)>0) for (kk in 1:length(components)) {
             components[[kk]]$reinitialize(.self$n.nodes, .self$edge.list, .self$node.names)
             if (class(components[[kk]]) %in% c("SBMcid", "MMSBMcid", "HBMcid")) {
@@ -307,17 +305,17 @@ CIDnetwork$methods(
                 intercept.v <<- 0.000000000001
             }
         }
-        
-        
+
+
         if (reciprocity.present) {
             ## find matches.
             reciprocal.match <<- apply(edge.list, 1, function(ee) min(which(edge.list[, 1] == ee[2] & edge.list[, 2] == ee[1])))
         } else {
             reciprocal.match <<- rep(as.integer(NA), length(outcome))
         }
-        
+
     },
-    
+
     pieces = function(include.name = FALSE) {
         if (length(components)>0) {
             c(list(intercept = intercept,
@@ -334,22 +332,22 @@ CIDnetwork$methods(
                  int.correlation = int.correlation)
         }
     },
-    
+
     show = function() {
         message("CIDnetwork object properties:")
-        
+
         message(paste("class.outcome:", class.outcome))
         if (class.outcome == "ordinal") message(paste("Ordinal groups:", ordinal.count))
         message(paste("Nodes:", n.nodes))
         if (is.directed) message(paste("Potential Directed Arcs:", nrow(edge.list))) else message(paste("Potential Undirected Edges:", nrow(edge.list)))
-        
-        
+
+
         message("Intercept: ", intercept)
         message("Variance: ", residual.variance)
         if (length(components)>0) for (kk in 1:length(components)) {
             message(class(components[[kk]])); components[[kk]]$show()
         }
-        
+
     },
     plot = function(coefs = coef.cov, names = 1:length(coefs),
                     sd = NULL, interval = NULL, ...) {
@@ -375,16 +373,16 @@ CIDnetwork$methods(
         }
         rowSums(comp.values.here)[edges]
     },
-    
+
     summary = function() show(),
-    
+
     generate = function() {
         if (reciprocity.present) {
             int.deviation <- matrix(rnorm(2*nrow(edge.list), 0, sqrt(residual.variance)), ncol = 2)
             int.deviation[, 2] <- int.correlation*int.deviation[, 1] + sqrt(1-int.correlation^2)*int.deviation[, 2]
-            
+
             swaps <- which(edge.list[, 1]>edge.list[, 2] & !is.na(reciprocal.match))
-            
+
             int.deviation[swaps, 1] <- int.deviation[reciprocal.match[swaps], 2]
             int.outcome <<- value(redo = TRUE) + int.deviation[, 1]
         } else {
@@ -408,7 +406,7 @@ CIDnetwork$methods(
             return(value() - comp.values[, kk])
         } else {
             return(value() - intercept)
-        } 
+        }
     },
     update.comp.values = function() {
         if ( length(components) > 0 ) {
@@ -417,9 +415,9 @@ CIDnetwork$methods(
             comp.values <<- matrix(0, nrow = nrow(edge.list))
         }
     },
-    
-    
-    
+
+
+
     ## Update Z_ij.
     update.intermediate.outcome = function() {
         value.hold <- value(redo = TRUE)
@@ -431,22 +429,22 @@ CIDnetwork$methods(
             io.temp[is.na(outcome)] <- rnorm(sum(is.na(outcome)),
                                              value.hold[is.na(outcome)], 1)
             int.outcome <<- io.temp
-            
+
         }
         if (class.outcome == "ordinal") {
             ##first, update the values themselves.
             io.temp <- int.outcome
-            
+
             ##matched.value <- value.hold[reciprocal.match]
             lohi <- edge.list[, 1] < edge.list[, 2]
-            
+
             breaker.lower <- c(-Inf, 0, ordinal.cutoffs)
             breaker.upper <- c(0, ordinal.cutoffs, Inf)
-            
+
             breakers.lower <- breaker.lower[outcome + 1]
             breakers.upper <- breaker.upper[outcome + 1]
-            
-            
+
+
             ##are any going to be trouble?
             p.gen <- rep(0.5, length(outcome))
             for (ii in 1:ordinal.count) {
@@ -454,7 +452,7 @@ CIDnetwork$methods(
                     pnorm(breaker.upper[ii], value.hold[!is.na(outcome) & outcome == ii-1], 1) - pnorm(breaker.lower[ii], value.hold[!is.na(outcome) & outcome == ii-1], 1)
             }
             p.gen[is.na(outcome)] <- 0
-            
+
             ##for (ii in 1:ordinal.count) {
             ## unmatched edges.
             condition <- p.gen > 1e-10 & is.na(reciprocal.match)
@@ -463,7 +461,7 @@ CIDnetwork$methods(
                        value.hold[condition], 1,
                        lower = breakers.lower[condition],
                        upper = breakers.upper[condition])
-            
+
             ##matched edges, (lower, higher).
             condition <- p.gen > 1e-10 & !is.na(reciprocal.match) & lohi
             io.temp[condition] <-
@@ -472,7 +470,7 @@ CIDnetwork$methods(
                        1 - int.correlation^2,
                        lower = breakers.lower[condition],
                        upper = breakers.upper[condition])
-            
+
             #matched edges, (higher, lower).
             condition <- p.gen > 1e-10 & !is.na(reciprocal.match) & !lohi
             io.temp[condition] <-
@@ -481,14 +479,14 @@ CIDnetwork$methods(
                        1 - int.correlation^2,
                        lower = breakers.lower[condition],
                        upper = breakers.upper[condition])
-            
+
             p.gen[is.na(outcome)] <- 0.5
             io.temp[p.gen <= 1e-10] <- (breakers.lower[p.gen <= 1e-10]+breakers.upper[p.gen <= 1e-10])/2
             io.temp[p.gen <= 1e-10 & outcome == 0 ] <- (breakers.upper[outcome == 0 & p.gen <= 1e-10])
             io.temp[(p.gen <= 1e-10) & (outcome == ordinal.count - 1)] <- (breakers.lower[outcome == ordinal.count - 1 & p.gen <= 1e-10])
-            
+
             int.outcome <<- io.temp
-            
+
             ##now, change the cutoff values, which lie between the Z values for each one. Assume a flat prior for now.
             if (length(ordinal.cutoffs)>0) for (kk in 1:length(ordinal.cutoffs)) {
                 effective.range <- c(max(int.outcome[outcome <= kk]), min(int.outcome[outcome >= kk+1]))
@@ -496,25 +494,25 @@ CIDnetwork$methods(
                 if (is.na(effective.range[2])) effective.range[1] <- 10000
                 ordinal.cutoffs[kk] <<- runif(1, effective.range[1], effective.range[2])
             }
-            
+
         }
     },
     int.correlation.prior = function(pp = int.correlation) {
         ## Simple slice sampler for autocorrelation term \rho. Pretty optimized! Act, 6-3-14
         dbeta((1+pp)/2,  int.correlation.ab[1], int.correlation.ab[2], log = TRUE) - log(2)
     },
-    
+
     draw.int.correlation = function() {
         #Note: this is being drawn from the main likelihood, not the intermediate likelihood, because it's more efficient for the whole chain.
         these.pieces <- pieces()
         current.value <- int.correlation
-        
+
         #First: draw uniform at current value and establish the vertical cut.
         cut.1 <- log(runif(1)) +
             log.likelihood.by.value(value.ext(these.pieces), these.pieces) + #, use.intermediate = TRUE) +  BD 12/31
             int.correlation.prior(current.value)
         limits <- c(-0.9999, 0.9999)
-        
+
         emergency.count <- 0
         repeat {
             prop.value <- runif(1, limits[1], limits[2])   #Draw proposal value between the bounds.
@@ -523,12 +521,12 @@ CIDnetwork$methods(
                 int.correlation.prior(prop.value) > cut.1) {   #is the current density above the threshold?
                 int.correlation <<- prop.value; break    #keep it and save.
             } else limits[1 + 1*(prop.value > current.value)] <- prop.value    #Trim down.
-            
+
             emergency.count <- emergency.count+1; if (emergency.count > 1000) stop("In draw.int.correlation, way too many narrows-down were made. This is either at a peak or it's broken.")
         }
-        
+
     },
-    
+
     #What does the grid say?
     test.int.correlation = function(rho = seq(-19, 19)/20) {
         these.pieces <- pieces()
@@ -538,12 +536,12 @@ CIDnetwork$methods(
                 int.correlation.prior(rr)
         })
     },
-    
-    
-    
-    
+
+
+
+
     draw.intercept = function(verbose = 2) {
-        
+
         outcomeresid <- int.outcome - rem.values(0);
         varpiece <- solve(nrow(edge.list)/residual.variance + 1/intercept.v)
         meanpiece <- varpiece*(sum(outcomeresid)/residual.variance + intercept.m/intercept.v)
@@ -551,9 +549,9 @@ CIDnetwork$methods(
             message("Intercept ", meanpiece, " ", sqrt(varpiece))
         }
         intercept <<- rnorm(1, meanpiece, sqrt(varpiece))
-        
+
     },
-    
+
     ## Note: getting this to work for 2D pmvnorm. ACT, 5-23-14
     log.likelihood.by.value = function(value.this = value(),
                                        pieces.this = pieces(),
@@ -567,28 +565,28 @@ CIDnetwork$methods(
             if (reciprocity.present) {
                 picks <- which(is.na(reciprocal.match))
                 output[picks] <- dnorm(outcomeresid[picks], 0, sqrt(pieces.this$residual.variance), log = TRUE)
-                
+
                 picks2 <- which(!is.na(reciprocal.match) & edge.list[, 1] < edge.list[, 2])
                 output[picks2] <- dmvnorm(cbind(outcomeresid[picks2], outcomeresid[reciprocal.match[picks2]]),
                                           rep(0, 2),
                                           pieces.this$residual.variance*cm(pieces.this$int.correlation),
                                           log = TRUE)
             } else output <- dnorm(outcomeresid, 0, sqrt(pieces.this$residual.variance), log = TRUE)
-            
+
             if (sumup) output <- sum(output[!is.na(outcome)])
         } else if (class.outcome == "ordinal") {
-            
+
             breaker.lower <- c(-Inf, 0, pieces.this$ordinal.cutoffs)
             breaker.upper <- c(0, pieces.this$ordinal.cutoffs, Inf)
-            
+
             ##  Getting ranges for non-NA outcomes
             breakers.lower <- breaker.lower[outcome[!is.na(outcome)] + 1]
             breakers.upper <- breaker.upper[outcome[!is.na(outcome)] + 1]
             value.this <- value.this[!is.na(outcome)]
-            
+
             ##  BD Added 12/31
             reciprocal.match.na <- reciprocal.match[!is.na(outcome)]
-            
+
             # first: unmatched edges.
             if (reciprocity.present) {
                 picks <- which(is.na(reciprocal.match.na))
@@ -603,19 +601,19 @@ CIDnetwork$methods(
                     sqrt(pieces.this$residual.variance)
                 )
                 output[picks] <- log(upper - lower)
-                
+
                 ## now, matched edges.  BD added !is.na(outcome)
                 picks2 <- which(!is.na(reciprocal.match.na) & edge.list[!is.na(outcome), 1] < edge.list[!is.na(outcome), 2])
-                
+
                 ## ACT was working on this. See basefunctions line 51
                 output[picks2] <- my.pmvnorm(lower = matrix(breakers.lower[c(picks2, reciprocal.match.na[picks2])], ncol = 2),
                                              upper = matrix(breakers.upper[c(picks2, reciprocal.match.na[picks2])], ncol = 2),
                                              meanval = matrix(value.this[c(picks2, reciprocal.match.na[picks2])], ncol = 2),
                                              sigma = pieces.this$residual.variance,
                                              rho = pieces.this$int.correlation)
-                
+
             } else {
-                
+
                 output <- log(
                     pnorm(breakers.upper,
                           value.this,
@@ -626,69 +624,69 @@ CIDnetwork$methods(
             }
             if(sumup) output <- sum(output)
         }
-        
+
         return(output)
     },
-    
+
     update.log.likelihood = function() {
         log.likelihood <<- log.likelihood.by.value()
     },
-    
+
     draw.variance = function(verbose = 2) {
         outcomeresid <- int.outcome - value();
-        
+
         if (verbose > 2) message("Variance: ",nrow(edge.list), " ", sum(outcomeresid^2))
         residual.variance <<-
             1/rgamma(1,
                      residual.variance.ab[1] + nrow(edge.list)/2,
                      residual.variance.ab[2] + sum(outcomeresid^2)/2)
-        
+
     },
-    
+
     draw = function(verbose = FALSE) {
-        
+
         if (reciprocity.present) draw.int.correlation()
         if (class.outcome != "gaussian") update.intermediate.outcome()
-        
+
         if (length(components)>0) for (kk in 1:length(components)) {
             update.comp.values()
             components[[kk]]$outcome <<- .self$int.outcome - rem.values(kk)
             components[[kk]]$residual.variance <<- residual.variance
             components[[kk]]$draw()
-            
+
             if (exists("shift", components[[kk]])) {   ### - where does this currently arise?
                 intercept <<- intercept + components[[kk]]$shift
                 components[[kk]]$shift <<- 0
             }
         }
-        
+
         #variance and intercept.
         update.comp.values()
         draw.intercept(verbose)
-        
+
         if (class.outcome == "gaussian") {
             update.comp.values()
             draw.variance(verbose)
             update.comp.values()
         }
-        
+
         ## update correlation!!! ACT, 5-23-14
-        
+
         update.log.likelihood()
-        
+
     },
-    
+
     random.start = function() {
         intercept <<- rnorm(1, 0, 1)
         #        draw.intercept()
         if (length(components)>0) for (kk in 1:length(components)) components[[kk]]$random.start()
         if (class.outcome == "gaussian") draw.variance()
         if (reciprocity.present) draw.int.correlation()
-        
+
         update.log.likelihood()
-        
+
     },
-    
+
     gibbs.full = function(
         report.interval = 100, draws = 100,
         burnin = -1, thin = 10,   #auto-cut.
@@ -699,7 +697,7 @@ CIDnetwork$methods(
         extend.max = 10,
         extend.count = 100,
         verbose = 2) {
-        
+
         #if (auto.burn.cut) {thin <- 10; burnin <- 0}
         if (thin < 1) stop("thin must be an integer greater than zero.")
         if (burnin >= 0) {
@@ -711,11 +709,11 @@ CIDnetwork$methods(
                 message("Negative burn-in inputted -- defaulting to auto-burn-in.")
             auto.burn.cut <- TRUE
         }
-        
-        
+
+
         out <- list()
         if (make.random.start) random.start()
-        
+
         if (auto.burn.cut) {
             if(verbose > 1)
                 message("CID Auto-Burning In")
@@ -728,7 +726,7 @@ CIDnetwork$methods(
                     loglikes[kk] <- log.likelihood
                 }
                 time.two <- proc.time()[3] - time.one
-                
+
                 #  obj1 <- lm(loglikes ~ theseruns)
                 #  slopes <- summary(obj1)$coef[2, c(1, 4)]
                 #  if (slopes[1]<0 | slopes[2] > 0.05) break else message("CID Still Auto-Burning In")
@@ -741,20 +739,20 @@ CIDnetwork$methods(
                 ##else message("CID Still Auto-Burning In")
                 ##}
             }
-            
+
             if(verbose > 0)
                 message("CID Auto-Burned In. Estimated Seconds Remaining: ",
                         round(time.two/auto.burn.count*thin*draws))
             burnin <- 0
         }
-        
-        
+
+
         if(burnin > 0) time.one <- proc.time()[3]
         for (kk in 1:(draws*thin+burnin)) {
             draw();
             index <- (kk-burnin)/thin
             if (kk > burnin & round(index) == index) {
-                
+
                 out[[index]] <- pieces(include.name = TRUE)
                 if (report.interval > 0 & index %% report.interval == 0) {
                     if(verbose > 1) message("CID ",index)
@@ -771,23 +769,23 @@ CIDnetwork$methods(
                 }
             }
         }
-        
+
         if(auto.converge){
             extend.iter <- 0
             extend.count <- min(extend.count, draws)
-            
+
             while(!convergence.test(out) & extend.iter < extend.max) {
                 if(verbose > 0)
                     message("CID Convergence not detected.  Extending chain")
                 extend.iter <- extend.iter + 1
-                
+
                 ##  Shifting Chain
                 if(draws > extend.count){
                     for(ii in 1:(draws - extend.count)){
                         out[[ii]] <- out[[ii + extend.count]]
                     }
                 }
-                
+
                 ##  Getting new draws
                 for(kk in 1:(extend.count*thin)){
                     draw();
@@ -797,7 +795,7 @@ CIDnetwork$methods(
                     }
                 }
             }
-            
+
             if(!convergence.test(out)){
                 if(verbose > 0)
                     message("CID Convergence not detected after maximum extensions")
@@ -806,10 +804,10 @@ CIDnetwork$methods(
                     message("CID Converged")
             }
         }
-        
+
         return(out)
     },
-    
+
     convergence.test = function(gibbs.out){
         log.lik <- unlist(gibbs.switcheroo(gibbs.out)$log.lik)
         draws <- length(log.lik)
@@ -817,25 +815,25 @@ CIDnetwork$methods(
         chain.2 <- log.lik[(draws/2 + 1):draws]
         sd.est <- sqrt(var(chain.1)/length(chain.1) +
                            var(chain.2)/length(chain.2))
-        
+
         return((mean(chain.2) - mean(chain.1)) <= qnorm(0.999) * sd.est)
     },
-    
+
     #Removes magic number later. This should be the length of(intercept, residual, loglik, cutoffs, int.correlation).
     non.comp.count = function() 5,
-    
-    
+
+
     gibbs.value = function(gibbs.out){
         sapply(gibbs.out, function(gg) return(value.ext(gg)))
     },
-    
-    
+
+
     gibbs.mean = function(gibbs.out){
-        
+
         switched <- gibbs.switcheroo(gibbs.out)
         intercept.mean <- mean(unlist(switched$intercept))
         components.mean <- NULL
-        
+
         if(length(components) > 0){
             for(cc in 1:length(components)){
                 components.mean <- c(components.mean, components[[cc]]$gibbs.mean(switched[[cc+non.comp.count()]]))
@@ -866,8 +864,8 @@ CIDnetwork$methods(
         mean.object$update.comp.values()
         return(mean.object)
     },
-    
-    
+
+
     gibbs.switcheroo = function(gibbs.out) {   #returns the chain for each component/parameter.
         out <- lapply(1:length(gibbs.out[[1]]), function(el)
             lapply(1:length(gibbs.out), function(el2) gibbs.out[[el2]][[el]]))
@@ -883,27 +881,27 @@ CIDnetwork$methods(
         names(out) <- out.names
         return(out)
     },
-    
-    
-    
-    
+
+
+
+
     #      gibbs.summary = function(gibbs.out) {
     #        switched <- gibbs.switcheroo(gibbs.out)
     #        s.sum <- function(int1) c(min = min(int1), max = max(int1), mean = mean(int1), sd = sd(int1), quantile(int1, c(0.025, 0.975)))
     #        out <- list()
-    
+
     #        out$intercept <- s.sum(unlist(switched[[1]]))
     #        message("Intercept:"); print(out$intercept)
-    
+
     #        out$residual.variance <- s.sum(unlist(switched[[2]]))
     #        if (out$residual.variance[4] != 0) {  #SD
     #          message("Residual variance:")
     #          print(out$residual.variance)
     #        }
-    
+
     #        out$log.likelihood <- s.sum(unlist(switched[[3]]))
     #        message("Log likelihood:"); print(out$log.likelihood)
-    
+
     #        if (class.outcome == "ordinal") if (ordinal.count > 2) {
     #          o1 <- matrix(unlist(switched[[4]]), nrow = ordinal.count-2)
     #          out$ordinal.cutoffs <- t(apply(o1, 1, s.sum))
@@ -911,17 +909,17 @@ CIDnetwork$methods(
     #          message("Ordinal cutoffs:")
     #          print(out$ordinal.cutoffs)
     #        }
-    
+
     #        if (length(components) > 0) for (cc in 1:length(components)) {
     #          message("Component ", class(components[[cc]]),":")
     #          out[[cc+non.comp.count()]] <- components[[cc]]$print.gibbs.summary(switched[[cc+non.comp.count()]])
     #          names(out)[cc+non.comp.count()] <- class(components[[cc]])
     #        }
-    
+
     #        out <- structure(out, class = "summary.CID.Gibbs")
     #        return(invisible(out))
     #      },
-    
+
     gibbs.summary = function(gibbs.out) {
         switched <- gibbs.switcheroo(gibbs.out$results)
         s.sum <- function(int1) {
@@ -931,13 +929,13 @@ CIDnetwork$methods(
               round(quantile(int1, c(0.025, 0.975)), 3))
         }
         out <- list()
-        
+
         out$intercept <- s.sum(unlist(switched[[1]]))
-        
+
         out$residual.variance <- s.sum(unlist(switched[[2]]))
-        
+
         out$log.likelihood <- s.sum(unlist(switched[[3]]))
-        
+
         if (class.outcome == "ordinal") if (ordinal.count > 2) {
             o1 <- matrix(unlist(switched[[4]]), nrow = ordinal.count-2)
             out$ordinal.cutoffs <- t(apply(o1, 1, s.sum))
@@ -945,18 +943,18 @@ CIDnetwork$methods(
         }else{
             out$ordinal.cutoffs <- NULL
         }
-        
+
         if (length(components) > 0) for (cc in 1:length(components)) {
             ncc <- non.comp.count()
             out[[cc+ncc]] <- components[[cc]]$gibbs.summary(switched[[cc+ncc]])
             names(out)[cc+non.comp.count()] <- class(components[[cc]])
         }
-        
+
         out$CID.object <- gibbs.out$CID.object
         out <- structure(out, class = "summary.CID.Gibbs")
         return(out)
     },
-    
+
     #      print.gibbs.summary = function(gibbs.out) {
     #        switched <- gibbs.switcheroo(gibbs.out)
     #        s.sum <- function(int1) {c(min = round(min(int1), 3), max = round(max(int1), 3), estimated.mean = round(mean(int1)), estimated.sd = round(sd(int1), 3), round(quantile(int1, c(0.025, 0.975)), 3))}
@@ -991,35 +989,35 @@ CIDnetwork$methods(
     #        out <- structure(out, class = "summary.CID.Gibbs")
     #        return(invisible(out))
     #      },
-    
-    
+
+
     print.gibbs.summary = function(gibbs.sum){
-        
+
         message("Intercept:"); print(gibbs.sum$intercept[-(1:2)])
         if (gibbs.sum$residual.variance[4] != 0) {  #SD
             message("Residual variance:")
             print(gibbs.sum$residual.variance)
         }
-        
+
         message("Log likelihood:"); print(gibbs.sum$log.likelihood[-(1:2)])
-        
+
         if(!is.null(gibbs.sum$residual.variance[-(1:2)])){
             if(gibbs.sum$residual.variance["estimated.sd"] != 0){
                 message("Residual variance:")
                 print(gibbs.sum$residual.variance)
             }
         }
-        
+
         if (class.outcome == "ordinal") if (ordinal.count > 2) {
             message("Ordinal cutoffs:")
             print(gibbs.sum$ordinal.cutoffs)
         }
-        
+
         if(!is.null(gibbs.sum$ordinal.cutoffs)){
             message("Ordinal cutoffs:")
             print(gibbs.sum$ordinal.cutoffs)
         }
-        
+
         if (length(components) > 0){
             cov.count <- 0
             for (cc in 1:length(components)) {
@@ -1032,17 +1030,17 @@ CIDnetwork$methods(
                 for(ii in 1:length(ix)){
                     components[[cc]]$print.gibbs.summary(gibbs.sum[[ix]])
                 }
-                
+
                 #    print(round(gibbs.sum$class(components[[cc]])), 3)
             }
         }
         return()#invisible(gibbs.sum))
     },
-    
+
     gibbs.plot = function(gibbs.out, DIC = NULL, which.plots = 1:(length(components)+5), auto.layout = TRUE) {
-        
+
         switched <- gibbs.switcheroo(gibbs.out)
-        
+
         if (auto.layout) {
             if (intercept.v < 0.0001) which.plots <- which.plots[which.plots != 1]
             if (class.outcome != "gaussian") which.plots <- which.plots[which.plots != 2]
@@ -1051,14 +1049,14 @@ CIDnetwork$methods(
             cols <- ceiling(length(which.plots)/2)
             par(mfrow = c(2, cols))
         }
-        
+
         ## 1: Grand Intercept
         if (1 %in% which.plots & intercept.v >= 0.0001) plot.default(unlist(switched[[1]]),
                                                                      main = "Grand Intercept",
                                                                      xlab = "Iteration",
                                                                      ylab = "Intercept",
                                                                      type = "l")
-        
+
         ## 2: Residual variance. Skipped if not gaussian.
         if (2 %in% which.plots & class.outcome =="gaussian")
             plot.default(unlist(switched[[2]]), main = "Residual Variance",
@@ -1069,14 +1067,14 @@ CIDnetwork$methods(
             if (length(DIC)>= 2) main.label <- paste0(main.label, "\nDeviance of Average = ",signif(DIC[2], 5))
             if (length(DIC)>= 3) main.label <- paste0(main.label, "\nEffective Parameter Count = ",signif(DIC[3], 5))
         }
-        
+
         ## 3: Log-likelihood
         if (3 %in% which.plots) {
             plot.default(unlist(switched[[3]]), main = main.label,
                          xlab = "Iteration",ylab = "Log Likelihood",
                          type = "l")
         }
-        
+
         ## 4: Ordinal cutoffs.
         if (4 %in% which.plots & class.outcome =="ordinal" & ordinal.count>2) {
             draws <- length(unlist(switched[[1]]))
@@ -1087,23 +1085,23 @@ CIDnetwork$methods(
                          ylab = "Cutoff Value")
             abline(h = 0, col = 8)
         }
-        
+
         ## 5: Reciprocity
         if (5 %in% which.plots & reciprocity.present) {
             main.label <- "Reciprocal Correlation"
             plot.default(unlist(switched[[5]]), main = main.label,
                          xlab = "Iteration",
                          ylab = "Reciprocal Correlation")
-            
-            
+
+
         }
-        
+
         #6 to(5 + length(components)): components!
         if (length(components) > 0) for (cc in 1:length(components)) if ((non.comp.count()+cc) %in% which.plots) components[[cc]]$gibbs.plot(switched[[cc+non.comp.count()]])
-        
+
     },
-    
-    
+
+
     DIC = function(gibbs.out, add.parts = FALSE) {
         #all.values <- gibbs.value(gibbs.out)
         #deviance.of.average <- -2*log.likelihood.by.value(apply(all.values, 1, mean))
@@ -1117,20 +1115,20 @@ CIDnetwork$methods(
                                    average.deviance = average.deviance)
         return(output)
     },
-    
+
     marginal.loglikelihood = function(gibbs.out) {
         all.values <- gibbs.value(gibbs.out)
         model.log.likelihoods <- apply(all.values, 2, log.likelihood.by.value)
         1/mean(1/model.log.likelihoods)
     },
-    
+
     pseudo.CV.loglikelihood = function(gibbs.out) {
         all.values <- gibbs.value(gibbs.out)
         model.log.likelihoods <- apply(all.values, 2, log.likelihood.by.value, sumup = FALSE)
         each.like <- log(1/apply(1/exp(model.log.likelihoods), 1, mean))
         sum(each.like)
     }
-    
+
 )
 
 ### print.CIDnetwork <- function(x, ...) {}
@@ -1155,11 +1153,11 @@ CID <- function(input,    # Must be sociomatrix
                 intercept = 0,
                 verbose = 2,
                 ...) {
-    
+
     # Removed fill missing edges because the input is now a socimatrix
     # Removed "generate" feature because we should have a separate object/module
     # for simulating from the objects if we really want it.
-    
+
     # Checks if input exists
     # Input exists, checks that is must be matrix
     # Creates edge list, nnodes, outcome from sociomatrix
@@ -1173,7 +1171,7 @@ CID <- function(input,    # Must be sociomatrix
     } else {
         stop("CID: Input must be a symmetric sociomatrix.")
     }
-    
+
     n.nodes <- nrow(sociomatrix)
     is.directed <- !isSymmetric(sociomatrix)
     if (is.directed) {
@@ -1183,13 +1181,13 @@ CID <- function(input,    # Must be sociomatrix
         edge.list <- make.edge.list(n.nodes)
         outcome <- sociomatrix[u.diag(n.nodes)]
     }
-    
+
     if (missing(node.names)) {
         node.names <- seq_len(n.nodes)
     } else if (length(node.names) != n.nodes) {
         stop("CID: node.names must be of length n.nodes.")
     }
-    
+
     ordinal.count <- max(outcome, na.rm = TRUE) + 1
     if (class.outcome == "ordinal") {
         if (all(floor(outcome) == outcome, na.rm = TRUE)) {
@@ -1218,7 +1216,7 @@ CID <- function(input,    # Must be sociomatrix
                                  intercept = intercept,
                                  node.names = as.character(node.names),
                                  verbose = verbose, ...)
-    
+
     return(CID.object)
 }
 
@@ -1236,7 +1234,7 @@ CID.Gibbs <- function(input, # Must be CID.object, CID.gibbs.object or socio
                       extend.count = 100,
                       verbose = 2,
                       ...) {
-    
+
     # initializes empty results object. enables us to append new chain to
     # previously sampled CID.Gibbs obejct
     res <- c()
@@ -1249,7 +1247,7 @@ CID.Gibbs <- function(input, # Must be CID.object, CID.gibbs.object or socio
         #           an brand new object with the full extended chain of samples.
         #           What is to be done with the old object with the incomplete
         #           chain? Seems like this would take up a lot of memory
-        #           Would a better feature be to have an `extend` method on the 
+        #           Would a better feature be to have an `extend` method on the
         #           object?
         #  Concatenating Chains
         if (!new.chain) {
@@ -1269,7 +1267,7 @@ CID.Gibbs <- function(input, # Must be CID.object, CID.gibbs.object or socio
                           node.names = node.names,
                           verbose = verbose, ...)
     }
-    
+
     # run the gibbs sampler and return a completed chain.
     # if res is nonempty, appends the new chain to the previous results
     res <- c(res, CID.object$gibbs.full(draws = draws, burnin = burnin,
@@ -1279,7 +1277,7 @@ CID.Gibbs <- function(input, # Must be CID.object, CID.gibbs.object or socio
                                         extend.max = extend.max,
                                         extend.count = extend.count,
                                         verbose = verbose, ...))
-    
+
     # finishing up, computing the DIC and creating output object
     DIC <- CID.object$DIC(res, add.parts = TRUE)
     output <- list(results = res,
@@ -1287,7 +1285,7 @@ CID.Gibbs <- function(input, # Must be CID.object, CID.gibbs.object or socio
                    CID.mean = CID.object$gibbs.mean(res),
                    DIC = DIC)
     class(output) <- "CID.Gibbs"
-    
+
     return(output)
 }
 

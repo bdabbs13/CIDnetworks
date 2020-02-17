@@ -1,24 +1,3 @@
-#####################################################################################
-#
-# Gibbs Sampler collection for CID, given the collection of input terms.
-
-#source("COV-reference.R"); source("SBM-reference.R")e; source("LSM-reference.R"); source("SR-reference.R"); library(Rcpp); library(mvtnorm); library(msm); sourceCpp("../src/cid.cpp"); source("CID-basefunctions.R");
-
-library(R6)
-
-# .onAttach <- function(...) {
-#   packageStartupMessage("CIDnetworks v 0.8.0")
-# }
-
-
-# Components --------------------------------------------------------------
-
-# All subclasses available to CID.
-# note: calling LSMcid(...) works like this already
-
-# unwrap.CID.Gibbs <- function(gibbs.out) list.output.to.matrices(gibbs.out)
-
-
 CIDnetwork <- R6Class(
   classname = "CIDnetwork",
   public = list(

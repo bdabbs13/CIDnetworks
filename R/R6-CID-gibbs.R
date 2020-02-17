@@ -1,6 +1,3 @@
-library(R6)
-
-
 CIDGibbsOutput <- R6Class(
   classname="CIDGibbsOutput",
   public = list(

@@ -1,8 +1,3 @@
-library(R6)
-
-
-
-
 
 INTERCEPT <- function(intercept.m=0, intercept.v=1000, intercept=0){
   return(InterceptParams$new(intercept, intercept.m, intercept.v))
