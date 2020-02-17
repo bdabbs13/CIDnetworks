@@ -21,7 +21,9 @@ CIDGibbsOutput <- R6Class(
       self$intercept = rep(NA, total.draws)
 
       if (length(cid.network$components) > 0){
-        self$component_output = lapply(self$components, function(cc) cc$create.output.list())
+        self$component_output = unlist(lapply(cid.network$components, 
+                                              function(cc) cc$create.output.list(self$total.draws)), 
+                                       recursive=FALSE)
       }
     }
   )

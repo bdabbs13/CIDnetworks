@@ -1,0 +1,78 @@
+library(R6)
+
+
+
+
+
+INTERCEPT <- function(intercept.m=0, intercept.v=10, intercept=0){
+  return(InterceptParams$new(intercept, intercept.m, intercept.v))
+}
+
+InterceptParams <- R6Class(
+  classname = "InterceptParams",
+  public = list(
+    intercept=0,
+    intercept.m = 0,
+    intercept.v = 10,
+    
+    initialize = function(
+      intercept=0,
+      intercept.m = 0,
+      intercept.v = 10
+    ){
+      self$intercept = intercept
+      self$intercept.m = intercept.m
+      self$intercept.v = intercept.v
+    },
+    
+    create.component = function(n.nodes, edge.list, node.names){
+      return(InterceptComponent$new(edge.list, self))
+    }
+  )
+)
+
+
+InterceptComponent <- R6Class(
+  classname = "InterceptComponent",
+  public = list(
+    intercept=0,
+    intercept.m = 0,
+    intercept.v = 10,
+    
+    initialize = function(edge.list, params){
+      # Note this component doesn't actually need the edge.list
+      self$intercept = params$intercept
+      self$intercept.m = params$intercept.m
+      self$intercept.v = params$intercept.v
+      private$n.edges = length(edge.list)
+    },
+    
+    draw = function(outcome, residual_variance) {
+      posterior.variance <- 1 / (nrow(self$edge.list) / residual.variance + 1 / self$intercept.v)
+      posterior.mean <- posterior.variance * (sum(outcome) / self$residual.variance + self$intercept.m / self$intercept.v)
+      self$intercept <- rnorm(1, posterior.mean, sqrt(posterior.variance))
+    },
+    
+    create.output.list = function(total.draws){
+      return (list(
+        intercept.vector = rep(NA, total.draws)
+      ))
+    },
+    
+    update.output.list = function(gibbs.output.list, draw){
+      gibbs.output.list$component_output$intercept.vector[draw] = self$intercept
+    },
+
+    get.mean.component = function(gibbs.output.list){
+      return(mean(gibbs.output.list$component_output$intercept.vector))
+    },
+    
+    value = function(){
+      return(rep(self$intercept, private$n.edges))
+    }
+  ),
+  
+  private = list(
+    n.edges = NA
+  )
+)

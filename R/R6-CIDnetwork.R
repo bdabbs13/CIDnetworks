@@ -50,14 +50,12 @@ CIDnetwork <- R6Class(
       is.directed,
       outcome.is.continuous=FALSE,
       intercept=0,
-      components = list(),
+      components = NULL,
       # prior parameters
       intercept.m = 0,
       intercept.v = 0.000000000001,
       residual.variance.ab = c(0.001, 0.001),
-      # include.reciprocity = FALSE, #No reciprocity unless asked.
-      verbose = 2,
-      reinit=FALSE
+      verbose = 2
     ) {
       ## Initial checks. This is largely redundant right now, but that's OK.
       
@@ -102,20 +100,17 @@ CIDnetwork <- R6Class(
 
       self$intercept = intercept
       ### Loading Components  
+      if (is.null(components))
+        components <- list(INTERCEPT())
       if (class(components) != "list")
         components <- list(components)
       
-      # BD: Might want to add a check if you accidentally use intercept and SBM, etc.
-      # BD: Leaving reinit for now.  It's to pass the nodes and edge list in
-      if (reinit) {
-        for (kk in seq_along(components.t)) {
-          components[[kk]]$reinitialize(n.nodes = .self$n.nodes,
-                                        edge.list = .self$edge.list,
-                                        node.names = .self$node.names)
-        }
+      for (kk in seq_along(components)) {
+        self$components[[kk]] <- components[[kk]]$create.component(
+          self$n.nodes, self$edge.list, self$node.names
+          )
       }
 
-      self$components <- components
       self$update.intermediate.outcome()
     },
     
@@ -140,8 +135,8 @@ CIDnetwork <- R6Class(
       output.list$residual.variance[draw] = self$residual.variance
       output.list$intercept[draw] = self$intercept
       if (length(self$components) > 0){
-        for (kk in self$components){
-          self$components[kk]$update.output.list(output.list, draw)
+        for (component in self$components){
+          component$update.output.list(output.list, draw)
         }
       }
     },
@@ -323,23 +318,20 @@ CIDnetwork <- R6Class(
   
       if (class.outcome != "gaussian") self$update.intermediate.outcome()
   
-      self$update.comp.values()
       self$draw.intercept()
 
       if (length(self$components)>0) for (kk in 1:length(self$components)) {
-        self$update.comp.values()
         # BD NOTE: This seems like a messy way to pass around this information
         self$components[[kk]]$outcome <- self$intermediate.outcome - self$rem.values(kk)
         self$components[[kk]]$residual.variance <- self$residual.variance
         self$components[[kk]]$draw()
+        self$comp.values[,kk] = self$components[[kk]]$value()
       }
 
       if (class.outcome == "gaussian") {
-        self$update.comp.values()
         self$draw.variance(verbose)
       }
-      
-      self$update.comp.values()
+
       self$update.log.likelihood()
     },
   
