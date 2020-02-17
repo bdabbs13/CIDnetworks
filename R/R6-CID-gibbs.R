@@ -8,7 +8,6 @@ CIDGibbsOutput <- R6Class(
     total.draws = 0,
     log.likelihood = NULL,
     residual.variance = NULL,
-    intercept = NULL,
     component_output = list(),
     initialize = function(
       cid.network,
@@ -18,7 +17,6 @@ CIDGibbsOutput <- R6Class(
       self$total.draws = total.draws
       self$log.likelihood = rep(NA, total.draws)
       self$residual.variance = rep(NA, total.draws)
-      self$intercept = rep(NA, total.draws)
 
       if (length(cid.network$components) > 0){
         self$component_output = unlist(lapply(cid.network$components, 
@@ -85,7 +83,7 @@ CIDGibbs <- R6Class(
       gibbs.output.list <- CIDGibbsOutput$new(self$cid.network, self$draws)
 
       if (self$make.random.start)
-        self$random.start()
+        self$cid.network$random.start()
       
       if (self$use.auto.burnin){
         self$auto.burnin()
@@ -102,6 +100,7 @@ CIDGibbs <- R6Class(
         
         for (current.draw in 1:(self$draws * self$thin)) {
           self$cid.network$draw()
+          
           if (current.draw %% self$thin == 0){
             current.index = current.draw / self$thin
             self$cid.network$update.output.list(gibbs.output.list, current.index)
@@ -112,6 +111,7 @@ CIDGibbs <- R6Class(
         }
         converged = self$convergence.test(gibbs.output.list)
       }
+
       if (self$verbose > 0){
         if (converged){
           message("CID Converged")
@@ -123,19 +123,6 @@ CIDGibbs <- R6Class(
       return(gibbs.output.list)
     },
 
-    random.start = function() {
-      # BD: This should probably be moved over to CIDnetwork
-      self$cid.network$intercept <- rnorm(1, 0, 1)
-      if (length(self$cid.network$components) > 0){
-        for (kk in 1:length(components)){
-          self$cid.network$components[[kk]]$random.start()
-        }
-      } 
-      if (self$cid.network$class.outcome == "gaussian") self$cid.network$draw.variance()
-      self$cid.network$update.log.likelihood()
-      
-    },
-    
     auto.burnin = function(){
       repeat {
         if(self$verbose > 1) message("Auto-Burning In")
@@ -195,7 +182,7 @@ CIDGibbs <- R6Class(
       return((mean(chain.2) - mean(chain.1)) <= qnorm(0.999) * sd.est)
     },
     
-    
+    # TODO: Test this functionality
     gibbs.mean = function(gibbs.output.list){
       return(self$cid.network$get.mean.CIDnetwork(gibbs.output.list))
     }

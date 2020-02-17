@@ -31,10 +31,6 @@ CIDnetwork <- R6Class(
     is.directed = FALSE,
     class.outcome = "binary",
     intermediate.outcome = NULL,
-    # BD_NOTE: I think we should move intercept out of the CIDnetwork and make it a component
-    intercept = 0,
-    intercept.m = 0,
-    intercept.v = 1000,
     residual.variance = 1,
     residual.variance.ab = c(.001, .001),
     reciprocity.present = FALSE,
@@ -49,11 +45,8 @@ CIDnetwork <- R6Class(
       node.names,
       is.directed,
       outcome.is.continuous=FALSE,
-      intercept=0,
       components = NULL,
       # prior parameters
-      intercept.m = 0,
-      intercept.v = 0.000000000001,
       residual.variance.ab = c(0.001, 0.001),
       verbose = 2
     ) {
@@ -94,16 +87,15 @@ CIDnetwork <- R6Class(
       self$node.names = node.names
 
       ### Setting Parameters
-      self$intercept.m <- intercept.m
-      self$intercept.v <- intercept.v
       self$residual.variance.ab <- residual.variance.ab
 
-      self$intercept = intercept
       ### Loading Components  
       if (is.null(components))
         components <- list(INTERCEPT())
       if (class(components) != "list")
         components <- list(components)
+      if (length(components) < 1)
+        stop("ERROR: components list must have at least one item")
       
       for (kk in seq_along(components)) {
         self$components[[kk]] <- components[[kk]]$create.component(
@@ -133,22 +125,16 @@ CIDnetwork <- R6Class(
     update.output.list = function(output.list, draw){
       output.list$log.likelihood[draw] = self$log.likelihood
       output.list$residual.variance[draw] = self$residual.variance
-      output.list$intercept[draw] = self$intercept
-      if (length(self$components) > 0){
-        for (component in self$components){
-          component$update.output.list(output.list, draw)
-        }
+      for (component in self$components){
+        component$update.output.list(output.list, draw)
       }
     },
     
     get.mean.CIDnetwork = function(gibbs.output.list){
 
-      intercept.mean <- mean(gibbs.output.list$intercept)
       mean.components = list()
-      if(length(components) > 0){
-        for(cc in 1:length(components)){
-          mean.components[[cc]] = self$components[[cc]]$get.mean.component(gibbs.output.list)
-        }
+      for(cc in 1:length(components)){
+        mean.components[[cc]] = self$components[[cc]]$get.mean.component(gibbs.output.list)
       }
       
       CID.mean <- CIDnetwork$new(
@@ -156,11 +142,8 @@ CIDnetwork <- R6Class(
         node.names = self$node.names,
         is.directed = self$is.directed,
         outcome.is.continuous = self$class.outcome == "gaussian",
-        intercept=intercept.mean,
         components = mean.components,
         # prior parameters
-        intercept.m = self$intercept.m,
-        intercept.v = self$intercept.v,
         residual.variance.ab = self$residual.variance.ab,
         verbose = self$verbose,
         reinit = FALSE
@@ -170,53 +153,21 @@ CIDnetwork <- R6Class(
       CID.mean$update.comp.values()
       return(CID.mean)
     },
-    # pieces = function(
-    #   include.name = FALSE
-    # ) {
-    #   if (length(self$components)>0) {
-    #     c(
-    #       list(
-    #         intercept = self$intercept,
-    #         residual.variance = self$residual.variance,
-    #         log.likelihood = self$log.likelihood,
-    #         ordinal.cutoffs = self$ordinal.cutoffs,
-    #         int.correlation = self$int.correlation
-    #       ),
-    #       lapply(self$components, function(cc) cc$pieces(include.name))
-    #       )
-    #   } else {
-    #     list(
-    #       intercept = self$intercept,
-    #       residual.variance = self$residual.variance,
-    #       log.likelihood = self$log.likelihood,
-    #       ordinal.cutoffs = self$ordinal.cutoffs,
-    #       int.correlation = self$int.correlation
-    #     )
-    #   }
-    #   },
     
     value = function() {
-      rowSums(self$comp.values) + self$intercept
+      rowSums(self$comp.values)
     },
     
-    rem.values = function(kk) {
-      if (kk>0){
-        self$value() - self$comp.values[, kk]
-      }else {
-        self$value() - self$intercept
-      }
+    rem.value = function(kk) {
+      return(rowSums(self$comp.values[, -kk, drop=FALSE]))
     },
     
     update.comp.values = function() {
-      if (length(self$components)>0){
-        self$comp.values <- sapply(self$components, function(cc) cc$value())
-      }
+      self$comp.values <- sapply(self$components, function(cc) cc$value())
     },
     
     ## Update Z_ij.
     update.intermediate.outcome = function() {
-      # BD: Is this necessary?
-      self$update.comp.values()
       current.value <- self$value()
       
       if(class.outcome == "gaussian"){
@@ -250,13 +201,6 @@ CIDnetwork <- R6Class(
           sd=1
         )
       }
-    },
-    
-    draw.intercept = function() {
-      outcome.residual <- self$intermediate.outcome - self$rem.values(0);
-      posterior.variance <- 1 / (nrow(self$edge.list) / self$residual.variance + 1 / self$intercept.v)
-      posterior.mean <- posterior.variance * (sum(outcome.residual) / self$residual.variance + self$intercept.m / self$intercept.v)
-      self$intercept <- rnorm(1, posterior.mean, sqrt(posterior.variance))
     },
     
     log.likelihood.by.value = function(value,
@@ -316,29 +260,28 @@ CIDnetwork <- R6Class(
   
     draw = function(verbose = FALSE) {
   
-      if (class.outcome != "gaussian") self$update.intermediate.outcome()
-  
-      self$draw.intercept()
+      if (class.outcome != "gaussian")
+        self$update.intermediate.outcome()
 
-      if (length(self$components)>0) for (kk in 1:length(self$components)) {
-        # BD NOTE: This seems like a messy way to pass around this information
-        self$components[[kk]]$outcome <- self$intermediate.outcome - self$rem.values(kk)
-        self$components[[kk]]$residual.variance <- self$residual.variance
-        self$components[[kk]]$draw()
+      for (kk in 1:length(self$components)) {
+        # browser()
+        residual.outcome <- self$intermediate.outcome - self$rem.value(kk)
+        self$components[[kk]]$draw(residual.outcome, self$residual.variance)
         self$comp.values[,kk] = self$components[[kk]]$value()
       }
 
-      if (class.outcome == "gaussian") {
+      if (class.outcome == "gaussian")
         self$draw.variance(verbose)
-      }
 
       self$update.log.likelihood()
     },
   
     random.start = function() {
-      self$intercept <- rnorm(1, 0, 1)
-      if (length(self$components)>0) for (kk in 1:length(self$components)) self$components[[kk]]$random.start()
-      if (class.outcome == "gaussian") draw.variance()
+      for (component in self$components){
+        component$random.start()
+      }
+      if (class.outcome == "gaussian")
+        draw.variance()
       self$update.log.likelihood()
     }
   )
