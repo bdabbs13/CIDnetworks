@@ -133,7 +133,7 @@ CIDnetwork <- R6Class(
     get.mean.CIDnetwork = function(gibbs.output.list){
 
       mean.components = list()
-      for(cc in 1:length(components)){
+      for(cc in 1:length(self$components)){
         mean.components[[cc]] = self$components[[cc]]$get.mean.component(gibbs.output.list)
       }
       
@@ -145,8 +145,7 @@ CIDnetwork <- R6Class(
         components = mean.components,
         # prior parameters
         residual.variance.ab = self$residual.variance.ab,
-        verbose = self$verbose,
-        reinit = FALSE
+        verbose = self$verbose
         )
 
       CID.mean$update.log.likelihood()
