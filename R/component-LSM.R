@@ -134,8 +134,8 @@ LSMComponent <- R6Class(
       # (why do we need a field called "dimension" then??)
       lsdim <- self$dimension
       
-      # FIXME: large wrapper function for proposal and accept/reject
-      # FIXME: Proposal function that uses vectorizaton
+      # TODO: large wrapper function for proposal and accept/reject
+      # TODO: Proposal function that uses vectorizaton
       # initializing vector copies to store the previous positions and the
       # proposal.
       latent.space.pos.hold <- self$latent.space.pos
@@ -181,12 +181,7 @@ LSMComponent <- R6Class(
         }
       }
       
-      # TODO: Be sure to add postprocess.latent.positions as private method
-      ## Rotate back.
-      ##        latent.space.pos.hold <- postprocess.latent.positions(latent.space.pos.hold)
-      
-      ## Procrustean transformation
-      ## Using random start as a target matrix
+      ## Procrustean transformation using random start as a target matrix
       latent.space.pos.hold <- private$post.procrustean(
         latent.space.pos.hold,
         self$latent.space.target
