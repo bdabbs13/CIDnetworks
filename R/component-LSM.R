@@ -1,0 +1,297 @@
+# QUESTION: latent.space.pos.m is never used, should we remove it?
+# NOTE: Exlcuded the following methods because they did not seem necessary
+#       - pieces
+#       - value.ext
+#       - show
+#       - plot.network # it seems pretty generic, not specific to LSM
+#       - gibbs.full
+#       - gibbs.value
+#       - gibbs.mean # seems to be donein get.mean.component
+#       - gibbs.node.colors # didn't do anything specific for LSM anyway
+#       - reinitialize # the Params thing looks like the work-around
+
+# Interface Definition ---------------------------------------------------
+LSM <- function(
+  dimension = 2,
+  latent.space.pos = NULL,
+  latent.space.pos.m = 0,
+  latent.space.pos.v = 100,
+  latent.space.pos.v.ab = c(0.001, 0.001),
+  latent.space.target = NULL,
+  inverted.model = FALSE,
+  tune = 0.1
+) {
+  return(LSMParams$new(dimension, latent.space.pos, latent.space.pos.m,
+                       latent.space.pos.v, latent.space.pos.v.ab,
+                       latent.space.target, inverted.model, tune))
+}
+
+# Param Definition -------------------------------------------------------
+LSMParams <- R6Class(
+  classname = "LSMParams",
+  inherit = BaseParams,
+  public = list(
+    # NOTE: "outcome" is handled in CIDnetwork
+    # TODO: What parts of initialization depend on the outcome input?
+    # TODO: What should have initial values?
+    dimension = 2,
+    # NOTE: arguments for target to be public vs. private in the COMPONENT
+    #         - in case the user wants to later access the target without access
+    #           to the input
+    # QUESTION: params that depend on other params might be able to defualt to NULL
+    latent.space.pos = NULL,
+    latent.space.pos.m = 0,
+    latent.space.pos.v = 100,
+    latent.space.pos.v.ab = c(0.001, 0.001),
+    latent.space.target = NULL,
+    inverted.model = FALSE,
+    tune = 0.1,
+
+    initialize = function(
+      dimension = 2,
+      latent.space.pos = NULL,
+      latent.space.pos.m = 0,
+      latent.space.pos.v = 100,
+      latent.space.pos.v.ab = c(0.001, 0.001),
+      latent.space.target = NULL,
+      inverted.model = FALSE,
+      tune = 0.1
+    ) {
+      self$dimension <- dimension
+      self$latent.space.pos <- latent.space.pos
+      self$latent.space.pos.m <- latent.space.pos.m
+      self$latent.space.pos.v <- latent.space.pos.v
+      self$latent.space.pos.v.ab <- latent.space.pos.v.ab
+      self$latent.space.target <- latent.space.target
+      self$inverted.model <- inverted.model
+      self$tune <- tune
+    },
+
+    create.component = function(n.nodes, edge.list, node.names) {
+      return(LSMComponent$new(n.nodes, edge.list, node.names, self))
+    }
+  )
+)
+
+# Component Class Definition --------------------------------------------
+LSMComponent <- R6Class(
+  classname = "LSMComponent",
+  inherit = BaseComponent,
+  public = list(
+    dimension = 2,
+    latent.space.pos = NULL,
+    latent.space.pos.m = 0,
+    latent.space.pos.v = 100,
+    latent.space.pos.v.ab = c(0.001, 0.001),
+    latent.space.target = NULL,
+    inverted.model = FALSE,
+    tune = 0.1,
+
+    # TODO: What else should be initialized?
+    initialize = function(n.nodes, edge.list, node.names, params) {
+      self$dimension <- dimension
+      self$latent.space.pos <- params$latent.space.pos
+      self$latent.space.pos.m <- params$latent.space.pos.m
+      self$latent.space.pos.v <- params$latent.space.pos.v
+      self$latent.space.pos.v.ab <- params$latent.space.pos.v.ab
+      self$latent.space.target <- params$latent.space.target
+      self$inverted.model <- params$inverted.model
+      self$tune <- params$tune
+      
+      private$n.nodes <- n.nodes
+      private$edge.list <- edge.list
+      private$node.names <- node.names
+      private$n.edges <- nrow(edge.list) # QUESTION: Need this?
+      private$mult.factor <- 2 * inverted.model - 1
+    },
+
+    random.start = function() {
+      "Generates a random latent positions to initiate the MCMC sampling. Places
+      Them in the correct object field."
+      n <- self$dimension * self$n.nodes
+      inits <- rnorm(n, 0, sqrt(self$latent.space.pos.v))
+      self$latent.space.pos <- matrix(inits, nrow = self$n.nodes)
+      self$latent.space.target <- self$latent.space.pos
+    },
+    
+    log.likelihood = function(parameters = pieces(),
+                              edges = seq_len(nrow(edge.list))) {
+      "Computes log-likelihood of outcome given with the mean being predicted by
+    a regression on the latent-space distances."
+      meanpart <- value.ext(parameters, edges)
+      sum(dnorm(outcome[edges], meanpart, sqrt(residual.variance), log = TRUE))
+    },
+    
+    draw = function(verbose = 0, mh.tune = tune, langevin.mode = FALSE) {
+      "Computes every step for each MCMC draw. MH step for latent space
+      positions, Gibbs update for variance."
+      # TODO: Update to be broken into private methods
+      # NOTES: This could be more self-documenting by breaking it into more
+      #        functions? It's also very slow looking. Not exploiting
+      #        vectorization.
+      
+      # dimension of latent space positions
+      # (why do we need a field called "dimension" then??)
+      lsdim <- self$dimension
+      
+      # FIXME: large wrapper function for proposal and accept/reject
+      # FIXME: Proposal function that uses vectorizaton
+      # initializing vector copies to store the previous positions and the
+      # proposal.
+      latent.space.pos.hold <- self$latent.space.pos
+      latent.space.pos.prop <- self$latent.space.pos
+      for (dd in 1:n.nodes) { # this is really slow, a lot of these steps can be vectorized
+        ## proposal for latent space positions.
+        walk <- as.vector(rmvnorm(1, rep(0, lsdim), diag(mh.tune^2, lsdim)))
+        latent.space.pos.prop[dd, ] <- latent.space.pos.prop[dd, ] + walk
+        
+        # FIXME: ratio computation function that uses vectorizaton
+        # computes density of proposal
+        llike.prop <- log.likelihood(
+          parameters = list(latent.space.pos.prop, private$mult.factor),
+          edges = edge.list.rows[[dd]]
+        )
+        ldens.pos.prop <- dnorm(
+          x = nt.space.pos.prop[dd, ],
+          mean = 0,
+          sd = sqrt(latent.space.pos.v),
+          log = TRUE
+        )
+        log.dens.prop <- llike.prop + sum(ldens.pos.prop)
+        
+        # compute log density of previously accepted draw
+        llike.orig <- log.likelihood(
+          parameters = list(latent.space.pos.hold, private$mult.factor),
+          edges = edge.list.rows[[dd]]
+        )
+        ldens.pos.orig <- dnorm(
+          x = latent.space.pos.hold[dd, ],
+          mean = 0,
+          sd = sqrt(latent.space.pos.v),
+          log = TRUE
+        )
+        log.dens.orig <- llike.orig + sum(ldens.pos.orig)
+        
+        # accepts or rejects proposal by comparing ratio to uniform(0, 1)
+        if (log.dens.prop - log.dens.orig > -rexp(1)) {
+          latent.space.pos.hold[dd, ] <- latent.space.pos.prop[dd, ]
+        } else {
+          # what does this do? latent.space.pos.prop is never used again
+          latent.space.pos.prop[dd, ] <- latent.space.pos.hold[dd, ]
+        }
+      }
+      
+      # TODO: Be sure to add postprocess.latent.positions as private method
+      ## Rotate back.
+      ##        latent.space.pos.hold <- postprocess.latent.positions(latent.space.pos.hold)
+      
+      ## Procrustean transformation
+      ## Using random start as a target matrix
+      latent.space.pos.hold <- private$post.procrustean(
+        latent.space.pos.hold,
+        self$latent.space.target
+      )
+      rownames(latent.space.pos.hold) <- node.names
+      
+      # store accepted proposal/previously accepted draw as new draw
+      self$latent.space.pos <- latent.space.pos.hold
+      
+      # Gibbs update draw from posterior of latent space position variance
+      a.factor <- nrow(latent.space.pos) * ncol(latent.space.pos) / 2
+      b.factor <- sum(latent.space.pos^2) / 2
+      g.draw <- rgamma(n = 1,
+                       shape = a.factor + latent.space.pos.v.ab[1],
+                       rate = b.factor + latent.space.pos.v.ab[2]
+      )
+      self$latent.space.pos.v <- 1 / g.draw # stores in field
+    },
+    
+    # TODO: Determine which variables should be output (ls.pos, v)
+    create.output.list = function(total.draws) {
+      init <- replicate(total.draws, matrix(NA, self$dimension, private$n.nodes))
+      init.dimperm <- aperm(init, perm = 3:1)
+      return(list(
+        latent.space.pos = init.dimperm,
+        latent.space.pos.v = rep(NA, total.draws)
+      ))
+    },
+    
+    
+    update.output.list = function(gibbs.output.list, draw) {
+      gibbs.output.list$component_output$latent.space.pos[draw] = self$latent.space.pos
+      gibbs.output.list$component_output$latent.space.pos.v[draw] = self$latent.space.pos.v
+    },
+    
+    get.mean.component = function(gibbs.output.list) {
+      return(LSMParams$new(
+        dimension = self$dimension,
+        latent.space.pos = apply(gibbs.output.list$component_output$latent.space.pos, c(2, 3), mean),
+        latent.space.pos.v = mean(gibbs.output.list$component_output$latent.space.pos.v),
+        latent.space.target = self$latent.space.target,
+        inverted.model = self$inverted.model
+      ))
+    },
+    
+    value = function() {
+      "Returns latent distance between nodes multiplied by multiplicative factor."
+      val <- private$mult.factor *
+        edge.list.distance(self$latent.space.pos, private$edge.list)
+      return(val)
+    },
+    
+    # QUESTION: Do we want these functions here or should there be a separate
+    #           module for handling summary functions?
+    gibbs.summary = function(gibbs.out) {
+      "Report mean latent space position across thinned gibbs draws."
+      lsp.all <- gibbs.output.list$component_output$latent.space.pos
+      # take mean across draws and reshape into matrix with nodes as rows
+      output <- matrix(apply(lsp.all, c(2, 3), mean), nrow = n.nodes)
+      rownames(output) <- node.names
+      colnames(output) <- paste0("pos", 1:ncol(output))
+      return(output)
+    },
+    
+    print.gibbs.summary = function(gibbs.sum) {
+      "Print summary without returning anything."
+      # NOTE: Is this intended?
+      message("Mean Latent Space Positions:")
+      print(gibbs.sum)
+      return()
+    },
+    
+    gibbs.plot = function(gibbs.out, ...) {
+      "Calls LSMcid plot method for mean gibbs draws."
+      get.sum <- gibbs.summary(gibbs.out)
+      main_title <- "Mean Latent Space Positions from Gibbs Sampler"
+      private$plot(get.sum, main = main_title, ...)
+    },
+  ),
+  # Private Methods and Attributes
+  private = list(
+    n.nodes = NA,
+    edge.list = NULL,
+    node.names = NULL,
+    n.edges = NA, # QUESTION: Need this?
+    mult.factor = NA,
+    plot = function(pos = self$latent.space.pos, ...) {
+      "Plots the latent space positions. pos argument accepts latent space
+       position matrix. Defaults to latent space position already in class."
+      latent.space.plot(pos, labels = private$node.names, ...)
+    },
+    procrustean.post <- function(latent.space.pos,
+                                 latent.space.target,
+                                 recenter = TRUE) {       
+      if (recenter) {
+        latent.space.pos <- scale(latent.space.pos, scale = FALSE)
+        latent.space.target <- scale(latent.space.target, scale = FALSE)
+      }
+      
+      projection = t(latent.space.target) %*% latent.space.pos
+      ssZ = svd(projection)
+      transformation = ssZ$v %*% t(ssZ$u)
+      latent.space.pos = latent.space.pos %*% transformation
+      
+      return(latent.space.pos)
+    }
+  )
+)
