@@ -1,4 +1,24 @@
-INTERCEPT <- function(intercept.m=0, intercept.v=1000, intercept=0){
+#' Specify intercept component for a CIDnetwork model
+#'
+#' Specify the prior mean and variance and starting value for the intercept
+#' component of your CIDnetwork model. Returns an `InterceptParams` object that
+#' stores the your supplied arguments. This output should be passed as part of a
+#' `list` of other components to the `components` argument of the 
+#' `CIDnetwork$new()` initialization method to define your model.
+#'
+#' @param intercept.m Numeric scalar specifying the prior mean (default = 0).
+#' @param intercept.v Numeric scalar specifying the prior variance (must be > 0;
+#'   default = 1000).
+#' @param intercept Numeric scalar defining the initial value for sampling 
+#'   (default = 0).
+#'
+#' @return An `InterceptParams` object that can be fed in a list of other 
+#'   components to the `components` argument of `CIDnetwork$new()`.
+#' @export
+#'
+#' TODO: refer to old examples for ideas
+#' @examples
+INTERCEPT <- function(intercept.m=0, intercept.v=1000, intercept=0) {
   return(InterceptParams$new(intercept, intercept.m, intercept.v))
 }
 
