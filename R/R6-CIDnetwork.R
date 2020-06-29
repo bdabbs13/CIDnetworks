@@ -40,7 +40,7 @@ CIDnetwork <- R6Class(
         stop("The provided sociomatrix is not square.")
       }
       self$n.nodes <- nrow(sociomatrix)
-
+      
       # BD: We should add a test that edge.list and outcome are the same length
       if (missing(is.directed)){
         is.directed = !isSymmetric(sociomatrix)
@@ -54,7 +54,8 @@ CIDnetwork <- R6Class(
         self$edge.list <- make.edge.list(self$n.nodes)
         self$outcome <- sociomatrix[u.diag(self$n.nodes)]  #just to be clear.
       }
-      self$comp.values <- matrix(0, nrow = nrow(self$edge.list))
+      self$comp.values <- matrix(0, nrow = nrow(self$edge.list),
+                                 ncol = length(components))
       
       ## Inferring Node Names
       if (missing(node.names)){
@@ -64,10 +65,10 @@ CIDnetwork <- R6Class(
         stop("Length of node.names differs from the number of nodes in network.")
       }
       self$node.names = node.names
-
+      
       ### Setting Parameters
       self$residual.variance.ab <- residual.variance.ab
-
+      
       ### Loading Components  
       if (is.null(components))
         components <- list(INTERCEPT())
@@ -79,9 +80,9 @@ CIDnetwork <- R6Class(
       for (kk in seq_along(components)) {
         self$components[[kk]] <- components[[kk]]$create.component(
           self$n.nodes, self$edge.list, self$node.names
-          )
+        )
       }
-
+      
       self$update.intermediate.outcome()
     },
     
@@ -110,7 +111,7 @@ CIDnetwork <- R6Class(
     },
     
     get.mean.CIDnetwork = function(gibbs.output.list){
-
+      
       mean.components = list()
       for(cc in 1:length(self$components)){
         mean.components[[cc]] = self$components[[cc]]$get.mean.component(gibbs.output.list)
@@ -125,8 +126,8 @@ CIDnetwork <- R6Class(
         # prior parameters
         residual.variance.ab = self$residual.variance.ab,
         verbose = self$verbose
-        )
-
+      )
+      
       CID.mean$update.log.likelihood()
       CID.mean$update.comp.values()
       return(CID.mean)
@@ -148,9 +149,9 @@ CIDnetwork <- R6Class(
     update.intermediate.outcome = function() {
       current.value <- self$value()
       
-      if(class.outcome == "gaussian"){
+      if(self$class.outcome == "gaussian") {
         self$intermediate.outcome <- outcome
-      }else if(class.outcome == "binary"){
+      } else if (self$class.outcome == "binary") {
         observed.ones = self$outcome == 1 & !is.na(self$outcome)
         observed.zeros = self$outcome == 0 & !is.na(self$outcome)
         
@@ -160,7 +161,7 @@ CIDnetwork <- R6Class(
           sd=1,
           lower=0
         )
-
+        
         self$intermediate.outcome[observed.zeros] = rtnorm(
           n=sum(observed.zeros), 
           mean=current.value[observed.zeros], 
@@ -190,17 +191,17 @@ CIDnetwork <- R6Class(
         value = self$value()
       if (missing(residual.variance))
         residual.variance = self$residual.variance
-
+      
       not.missing.indicator = !is.na(self$outcome)      
       cm <- function(pp) matrix(c(1, pp, pp, 1), nrow = 2)
       output <- 0 * self$intermediate.outcome
-      if (class.outcome == "gaussian" | use.intermediate) {
+      if (self$class.outcome == "gaussian" | use.intermediate) {
         outcomeresid <- self$intermediate.outcome - value
         output <- dnorm(outcomeresid[not.missing.indicator], 0, sqrt(residual.variance), log = TRUE)
-      } else if (class.outcome == "binary") {
+      } else if (self$class.outcome == "binary") {
         observed.outcomes = self$outcome[not.missing.indicator]
         observed.values = value[not.missing.indicator]
-
+        
         # This is a clever way to get probit probabilities.
         # The outcome is that for edges with value 1 we get 1 - pnorm
         # and for outcome with value 0 we get pnorm
@@ -208,7 +209,7 @@ CIDnetwork <- R6Class(
         breaker.upper <- c(0, Inf)
         breakers.lower <- breaker.lower[observed.outcomes + 1]
         breakers.upper <- breaker.upper[observed.outcomes + 1]
-  
+        
         output <- log(
           pnorm(breakers.upper,
                 observed.values,
@@ -218,7 +219,7 @@ CIDnetwork <- R6Class(
                   sqrt(residual.variance)))
       }
       if(sumup) output <- sum(output)
-
+      
       return(output)
     },
     
@@ -228,37 +229,37 @@ CIDnetwork <- R6Class(
     
     draw.variance = function() {
       outcomeresid <- self$intermediate.outcome - self$value()
-  
+      
       self$residual.variance <-
         1/rgamma(1,
                  residual.variance.ab[1] + nrow(edge.list)/2,
                  residual.variance.ab[2] + sum(outcomeresid^2)/2)
-  
+      
     },
-  
+    
     draw = function(verbose = FALSE) {
-  
-      if (class.outcome != "gaussian")
+      
+      if (self$class.outcome != "gaussian")
         self$update.intermediate.outcome()
-
+      
       for (kk in 1:length(self$components)) {
         # browser()
         residual.outcome <- self$intermediate.outcome - self$rem.value(kk)
         self$components[[kk]]$draw(residual.outcome, self$residual.variance)
         self$comp.values[,kk] = self$components[[kk]]$value()
       }
-
-      if (class.outcome == "gaussian")
+      
+      if (self$class.outcome == "gaussian")
         self$draw.variance(verbose)
-
+      
       self$update.log.likelihood()
     },
-  
+    
     random.start = function() {
       for (component in self$components){
         component$random.start()
       }
-      if (class.outcome == "gaussian")
+      if (self$class.outcome == "gaussian")
         draw.variance()
       self$update.log.likelihood()
     }

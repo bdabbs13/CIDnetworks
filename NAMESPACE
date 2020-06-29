@@ -22,7 +22,7 @@ importFrom("stats", "pnorm", "princomp", "quantile", "rbinom",
 
 #exportPattern("^[[:alpha:]]+")
 # R6 exports
-export(CIDGibbs, CIDGibbsOutput ,CIDnetwork, INTERCEPT)
+export(CIDGibbs, CIDGibbsOutput, CIDnetwork, INTERCEPT, LSM)
 #     	HBM,LSM,LVM,MMSBM,SBM,SR,BETA,
 # 
 #         unwrap.CID.Gibbs,

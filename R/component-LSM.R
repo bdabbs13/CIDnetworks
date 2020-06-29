@@ -1,7 +1,6 @@
 # QUESTION: latent.space.pos.m is never used, should we remove it?
 # NOTE: Exlcuded the following methods because they did not seem necessary
 #       - pieces
-#       - value.ext
 #       - show
 #       - plot.network # it seems pretty generic, not specific to LSM
 #       - gibbs.full
@@ -79,6 +78,10 @@ LSMComponent <- R6Class(
   inherit = BaseComponent,
   public = list(
     dimension = 2,
+    n.nodes = NA,
+    edge.list = NULL,
+    node.names = NULL,
+    n.edges = NA, # QUESTION: Need this?
     latent.space.pos = NULL,
     latent.space.pos.m = 0,
     latent.space.pos.v = 100,
@@ -89,7 +92,7 @@ LSMComponent <- R6Class(
 
     # TODO: What else should be initialized?
     initialize = function(n.nodes, edge.list, node.names, params) {
-      self$dimension <- dimension
+      self$dimension <- params$dimension
       self$latent.space.pos <- params$latent.space.pos
       self$latent.space.pos.m <- params$latent.space.pos.m
       self$latent.space.pos.v <- params$latent.space.pos.v
@@ -98,11 +101,11 @@ LSMComponent <- R6Class(
       self$inverted.model <- params$inverted.model
       self$tune <- params$tune
       
-      private$n.nodes <- n.nodes
-      private$edge.list <- edge.list
-      private$node.names <- node.names
-      private$n.edges <- nrow(edge.list) # QUESTION: Need this?
-      private$mult.factor <- 2 * inverted.model - 1
+      self$n.nodes <- n.nodes
+      self$edge.list <- edge.list
+      self$node.names <- node.names
+      self$n.edges <- nrow(edge.list) # QUESTION: Need this?
+      private$mult.factor <- 2 * self$inverted.model - 1
     },
 
     random.start = function() {
@@ -114,15 +117,17 @@ LSMComponent <- R6Class(
       self$latent.space.target <- self$latent.space.pos
     },
     
-    log.likelihood = function(parameters = pieces(),
-                              edges = seq_len(nrow(edge.list))) {
+    log.likelihood = function(outcome,
+                              residual.variance,
+                              parameters,
+                              edges = seq_len(nrow(self$edge.list))) {
       "Computes log-likelihood of outcome given with the mean being predicted by
     a regression on the latent-space distances."
-      meanpart <- value.ext(parameters, edges)
+      meanpart <- self$value.ext(parameters, edges)
       sum(dnorm(outcome[edges], meanpart, sqrt(residual.variance), log = TRUE))
     },
     
-    draw = function(verbose = 0, mh.tune = tune, langevin.mode = FALSE) {
+    draw = function(outcome, residual.variance) {
       "Computes every step for each MCMC draw. MH step for latent space
       positions, Gibbs update for variance."
       # TODO: Update to be broken into private methods
@@ -140,34 +145,39 @@ LSMComponent <- R6Class(
       # proposal.
       latent.space.pos.hold <- self$latent.space.pos
       latent.space.pos.prop <- self$latent.space.pos
-      for (dd in 1:n.nodes) { # this is really slow, a lot of these steps can be vectorized
+      for (dd in 1:self$n.nodes) { # this is really slow, a lot of these steps can be vectorized
         ## proposal for latent space positions.
-        walk <- as.vector(rmvnorm(1, rep(0, lsdim), diag(mh.tune^2, lsdim)))
+        walk <- as.vector(rmvnorm(1, rep(0, lsdim), diag(self$tune^2, lsdim)))
         latent.space.pos.prop[dd, ] <- latent.space.pos.prop[dd, ] + walk
         
         # FIXME: ratio computation function that uses vectorizaton
         # computes density of proposal
-        llike.prop <- log.likelihood(
+        edge.list.rows <- row.list.maker(self$edge.list)
+        llike.prop <- self$log.likelihood(
+          outcome = outcome,
+          residual.variance = residual.variance,
           parameters = list(latent.space.pos.prop, private$mult.factor),
           edges = edge.list.rows[[dd]]
         )
         ldens.pos.prop <- dnorm(
-          x = nt.space.pos.prop[dd, ],
+          x = latent.space.pos.prop[dd, ],
           mean = 0,
-          sd = sqrt(latent.space.pos.v),
+          sd = sqrt(self$latent.space.pos.v),
           log = TRUE
         )
         log.dens.prop <- llike.prop + sum(ldens.pos.prop)
         
         # compute log density of previously accepted draw
-        llike.orig <- log.likelihood(
+        llike.orig <- self$log.likelihood(
+          outcome = outcome,
+          residual.variance = residual.variance,
           parameters = list(latent.space.pos.hold, private$mult.factor),
           edges = edge.list.rows[[dd]]
         )
         ldens.pos.orig <- dnorm(
           x = latent.space.pos.hold[dd, ],
           mean = 0,
-          sd = sqrt(latent.space.pos.v),
+          sd = sqrt(self$latent.space.pos.v),
           log = TRUE
         )
         log.dens.orig <- llike.orig + sum(ldens.pos.orig)
@@ -182,28 +192,28 @@ LSMComponent <- R6Class(
       }
       
       ## Procrustean transformation using random start as a target matrix
-      latent.space.pos.hold <- private$post.procrustean(
+      latent.space.pos.hold <- private$procrustean.post(
         latent.space.pos.hold,
         self$latent.space.target
       )
-      rownames(latent.space.pos.hold) <- node.names
+      rownames(latent.space.pos.hold) <- self$node.names
       
       # store accepted proposal/previously accepted draw as new draw
       self$latent.space.pos <- latent.space.pos.hold
       
       # Gibbs update draw from posterior of latent space position variance
-      a.factor <- nrow(latent.space.pos) * ncol(latent.space.pos) / 2
-      b.factor <- sum(latent.space.pos^2) / 2
+      a.factor <- self$n.nodes * self$dimension / 2
+      b.factor <- sum(self$latent.space.pos^2) / 2
       g.draw <- rgamma(n = 1,
-                       shape = a.factor + latent.space.pos.v.ab[1],
-                       rate = b.factor + latent.space.pos.v.ab[2]
+                       shape = a.factor + self$latent.space.pos.v.ab[1],
+                       rate = b.factor + self$latent.space.pos.v.ab[2]
       )
       self$latent.space.pos.v <- 1 / g.draw # stores in field
     },
     
     # TODO: Determine which variables should be output (ls.pos, v)
     create.output.list = function(total.draws) {
-      init <- replicate(total.draws, matrix(NA, self$dimension, private$n.nodes))
+      init <- replicate(total.draws, matrix(NA, self$dimension, self$n.nodes))
       init.dimperm <- aperm(init, perm = 3:1)
       return(list(
         latent.space.pos = init.dimperm,
@@ -213,7 +223,7 @@ LSMComponent <- R6Class(
     
     
     update.output.list = function(gibbs.output.list, draw) {
-      gibbs.output.list$component_output$latent.space.pos[draw] = self$latent.space.pos
+      gibbs.output.list$component_output$latent.space.pos[draw, , ] = self$latent.space.pos
       gibbs.output.list$component_output$latent.space.pos.v[draw] = self$latent.space.pos.v
     },
     
@@ -230,9 +240,19 @@ LSMComponent <- R6Class(
     value = function() {
       "Returns latent distance between nodes multiplied by multiplicative factor."
       val <- private$mult.factor *
-        edge.list.distance(self$latent.space.pos, private$edge.list)
+        edge.list.distance(self$latent.space.pos, self$edge.list)
       return(val)
     },
+    
+    value.ext = function(parameters,
+                         edges = seq_len(nrow(self$edge.list))) {
+      "Returns latent distance between nodes multiplied by multiplicative factor.
+    parameters argument accepts list with latent.space.pos in first position,
+    latent.space.v in second position, and multiplicative factor in third."
+      # NOTES: this seems to be an error, parameters[[2]] from pieces() refers to
+      #        latent.space.pos.v rather than mult.factor (which is in position 3)
+      parameters[[2]] * edge.list.distance(parameters[[1]], rbind(self$edge.list[edges, ]))
+    },    
     
     # QUESTION: Do we want these functions here or should there be a separate
     #           module for handling summary functions?
@@ -259,21 +279,17 @@ LSMComponent <- R6Class(
       get.sum <- gibbs.summary(gibbs.out)
       main_title <- "Mean Latent Space Positions from Gibbs Sampler"
       private$plot(get.sum, main = main_title, ...)
-    },
+    }
   ),
   # Private Methods and Attributes
   private = list(
-    n.nodes = NA,
-    edge.list = NULL,
-    node.names = NULL,
-    n.edges = NA, # QUESTION: Need this?
     mult.factor = NA,
     plot = function(pos = self$latent.space.pos, ...) {
       "Plots the latent space positions. pos argument accepts latent space
        position matrix. Defaults to latent space position already in class."
-      latent.space.plot(pos, labels = private$node.names, ...)
+      latent.space.plot(pos, labels = self$node.names, ...)
     },
-    procrustean.post <- function(latent.space.pos,
+    procrustean.post = function(latent.space.pos,
                                  latent.space.target,
                                  recenter = TRUE) {       
       if (recenter) {
