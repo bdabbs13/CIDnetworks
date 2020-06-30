@@ -1,16 +1,41 @@
 # Interface Definition ---------------------------------------------------
+#' Specify LSM component for a CIDnetwork model
+#'
+#' @description
+#' Specify the prior mean and variance for the latent space positions, their
+#' starting values, and target positions for the LSM component of your
+#' CIDnetwork model. Returns an `LSMParams` object that stores the your supplied
+#' arguments. This output should be passed as part of a `list` of other
+#' components to the `components` argument of the `CIDnetwork$new()`
+#' initialization method to define your model.
+#' 
+#' @details
+#' 
+#'
+#' @param intercept.m Numeric scalar specifying the prior mean (default = 0).
+#' @param intercept.v Numeric scalar specifying the prior variance (must be > 0;
+#'   default = 1000).
+#' @param intercept Numeric scalar defining the initial value for sampling 
+#'   (default = 0).
+#'
+#' @return An `InterceptParams` object that can be fed in a list of other 
+#'   components to the `components` argument of `CIDnetwork$new()`.
+#' @export
+#'
+#' TODO: refer to old examples for ideas
+#' @examples
 LSM <- function(
   dimension = 2,
-  latent.space.pos = NULL,
   latent.space.pos.m = 0,
-  latent.space.pos.v = 100,
   latent.space.pos.v.ab = c(0.001, 0.001),
+  latent.space.pos = NULL,
+  latent.space.pos.v = 100,
   latent.space.target = NULL,
   inverted.model = FALSE,
   tune = 0.1
 ) {
-  return(LSMParams$new(dimension, latent.space.pos, latent.space.pos.m,
-                       latent.space.pos.v, latent.space.pos.v.ab,
+  return(LSMParams$new(dimension, latent.space.pos.m, latent.space.pos.v.ab,
+                       latent.space.pos, latent.space.pos.v,
                        latent.space.target, inverted.model, tune))
 }
 
@@ -20,29 +45,29 @@ LSMParams <- R6Class(
   inherit = BaseParams,
   public = list(
     dimension = 2,
-    latent.space.pos = NULL,
     latent.space.pos.m = 0,
-    latent.space.pos.v = 100,
     latent.space.pos.v.ab = c(0.001, 0.001),
+    latent.space.pos = NULL,
+    latent.space.pos.v = 100,
     latent.space.target = NULL,
     inverted.model = FALSE,
     tune = 0.1,
 
     initialize = function(
       dimension = 2,
-      latent.space.pos = NULL,
       latent.space.pos.m = 0,
-      latent.space.pos.v = 100,
       latent.space.pos.v.ab = c(0.001, 0.001),
+      latent.space.pos = NULL,
+      latent.space.pos.v = 100,
       latent.space.target = NULL,
       inverted.model = FALSE,
       tune = 0.1
     ) {
       self$dimension <- dimension
-      self$latent.space.pos <- latent.space.pos
       self$latent.space.pos.m <- latent.space.pos.m
-      self$latent.space.pos.v <- latent.space.pos.v
       self$latent.space.pos.v.ab <- latent.space.pos.v.ab
+      self$latent.space.pos <- latent.space.pos
+      self$latent.space.pos.v <- latent.space.pos.v
       self$latent.space.target <- latent.space.target
       self$inverted.model <- inverted.model
       self$tune <- tune
