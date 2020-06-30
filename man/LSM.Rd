@@ -26,23 +26,23 @@ latent space positions. (default = 0)}
 parameters for prior on the latent space position variance. (must be > 0;
 default = c(0.001, 0.001), which is considered a "weak" prior)}
 
-\item{latent.space.pos}{Numeric matrix of size `N X D` specifying the initial
-latent space positions. `N` is the number of nodes and `D` is the number of
-dimensions (same as `dimension` argument). Be careful that the matrix is
+\item{latent.space.pos}{Numeric matrix of size \verb{N X D} specifying the initial
+latent space positions. \code{N} is the number of nodes and \code{D} is the number of
+dimensions (same as \code{dimension} argument). Be careful that the matrix is
 exactly this size to avoid cryptic errors. (default = NULL, which randomly
 generates the positions from the prior)}
 
 \item{latent.space.pos.v}{Numeric scalar to specify this initial latent space
 position variance. (default = 100)}
 
-\item{latent.space.target}{Numeric matrix of size `N X D` specifying the
-initial target for the Procrustean transformation (see Details). `N` is the
-number of nodes and `D` is the number of dimensions (same as `dimension`
+\item{latent.space.target}{Numeric matrix of size \verb{N X D} specifying the
+initial target for the Procrustean transformation (see Details). \code{N} is the
+number of nodes and \code{D} is the number of dimensions (same as \code{dimension}
 argument). Be careful that the matrix is exactly this size to avoid cryptic
 errors. (default = NULL, which uses the user-supplied or randomly generated
 latent space positions)}
 
-\item{inverted.model}{Logical scalar, if `TRUE`, will make the probability of
+\item{inverted.model}{Logical scalar, if \code{TRUE}, will make the probability of
 a tie between two nodes positively related to their latent space distance,
 as opposed to negatively. (default = FALSE)}
 
@@ -50,15 +50,15 @@ as opposed to negatively. (default = FALSE)}
 space position propsal distribution. (default = 0.1)}
 }
 \value{
-An `LSMParams` object that can be fed in a list of other components
-  to the `components` argument of `CIDnetwork$new()`.
+An \code{LSMParams} object that can be fed in a list of other components
+to the \code{components} argument of \code{CIDnetwork$new()}.
 }
 \description{
 Specify the prior mean and variance for the latent space positions, their
 starting values, and target positions for the LSM component of your
-CIDnetwork model. Returns an `LSMParams` object that stores the your supplied
-arguments. This output should be passed as part of a `list` of other
-components to the `components` argument of the `CIDnetwork$new()`
+CIDnetwork model. Returns an \code{LSMParams} object that stores the your supplied
+arguments. This output should be passed as part of a \code{list} of other
+components to the \code{components} argument of the \code{CIDnetwork$new()}
 initialization method to define your model.
 }
 \details{
@@ -67,31 +67,32 @@ low-dimensional latent space, and the tie probability between nodes depends
 on the distance between their latent positions. Nodes close in latent space
 have a relatively high tie probability; nodes far apart in latent space have
 relatively low tie probability (this can be reversed using the
-`inverted.model` argument). Ties are conditionally independent, given the
+\code{inverted.model} argument). Ties are conditionally independent, given the
 latent positions.
 
 The model is written in notation as
-\deqn{Y_{ij} \sim \text{Bernoulli}(p_{ij})}
-\deqn{\text{logit}p_{ij} = \beta_0 \lvert Z_i - Z_j \rvert}
-\deqn{Z_i \sim N(\mu, \sigma^2 \mathbb{I}_d)}
-\deqn{\sigma^2 \sim \text{InvGamma}(\alpha, \beta)}
+\deqn{Y_{ij} \sim Bernoulli(p_{ij})}
+\deqn{logit(p_{ij}) = \beta_0 = \mid Z_i - Z_j \mid}
+\deqn{Z_i \sim N(\mu, \sigma^2 I_d)}
+\deqn{\sigma^2 \sim InvGamma(\alpha, \beta)}
 
 This package forces the prior distribution on the latent space positions to
 be orthogonal in the latent dimension, with identical variance.
 
 For this function
-\itemize
-  \item `d` corresponds to the `dimension` argument
-  \item \eqn{\mu} corresponds to the `latent.space.pos.m` argument
-  \item \eqn{\alpha}, \eqn{\beta} corresponds to the `latent.space.pos.v.ab`
-  argument, which is a two element vector for each hyperparameter.
-  
+\itemize{
+\item \code{d} corresponds to the \code{dimension} argument
+\item \eqn{\mu} corresponds to the \code{latent.space.pos.m} argument
+\item \eqn{\alpha}, \eqn{\beta} corresponds to the \code{latent.space.pos.v.ab}
+argument, which is a two element vector for each hyperparameter.
+}
+
 The latent space positions are identified up to a rigid body transformation.
 In other words, for a given latent space position vector, all translations
 and rotations of this vector will yield an identical likelihood.
 This packages applies a Procrustean transformation to the latent space
 positions after they are sampled to force the position vectors to maintain a
-relatively consistent orientation. The transformation attempts to align the 
-positions with the `latent.space.pos.target` supplied by the user or 
+relatively consistent orientation. The transformation attempts to align the
+positions with the \code{latent.space.pos.target} supplied by the user or
 auto-generated by default.
 }

@@ -19,20 +19,21 @@
 #' latent positions.
 #' 
 #' The model is written in notation as
-#' \deqn{Y_{ij} \sim \text{Bernoulli}(p_{ij})}
-#' \deqn{\text{logit}p_{ij} = \beta_0 \lvert Z_i - Z_j \rvert}
-#' \deqn{Z_i \sim N(\mu, \sigma^2 \mathbb{I}_d)}
-#' \deqn{\sigma^2 \sim \text{InvGamma}(\alpha, \beta)}
+#' \deqn{Y_{ij} \sim Bernoulli(p_{ij})}
+#' \deqn{logit(p_{ij}) = \beta_0 = \mid Z_i - Z_j \mid}
+#' \deqn{Z_i \sim N(\mu, \sigma^2 I_d)}
+#' \deqn{\sigma^2 \sim InvGamma(\alpha, \beta)}
 #' 
 #' This package forces the prior distribution on the latent space positions to
 #' be orthogonal in the latent dimension, with identical variance.
 #' 
 #' For this function
-#' \itemize
+#' \itemize{
 #'   \item `d` corresponds to the `dimension` argument
 #'   \item \eqn{\mu} corresponds to the `latent.space.pos.m` argument
 #'   \item \eqn{\alpha}, \eqn{\beta} corresponds to the `latent.space.pos.v.ab`
 #'   argument, which is a two element vector for each hyperparameter.
+#' }
 #'   
 #' The latent space positions are identified up to a rigid body transformation.
 #' In other words, for a given latent space position vector, all translations
