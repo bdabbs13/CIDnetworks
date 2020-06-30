@@ -1,24 +1,4 @@
 # Interface Definition ---------------------------------------------------
-#' Specify LSM component for a CIDnetwork model
-#'
-#' Specify the prior mean and variance and starting value for the intercept
-#' component of your CIDnetwork model. Returns an `InterceptParams` object that
-#' stores the your supplied arguments. This output should be passed as part of a
-#' `list` of other components to the `components` argument of the 
-#' `CIDnetwork$new()` initialization method to define your model.
-#'
-#' @param intercept.m Numeric scalar specifying the prior mean (default = 0).
-#' @param intercept.v Numeric scalar specifying the prior variance (must be > 0;
-#'   default = 1000).
-#' @param intercept Numeric scalar defining the initial value for sampling 
-#'   (default = 0).
-#'
-#' @return An `InterceptParams` object that can be fed in a list of other 
-#'   components to the `components` argument of `CIDnetwork$new()`.
-#' @export
-#'
-#' TODO: refer to old examples for ideas
-#' @examples
 LSM <- function(
   dimension = 2,
   latent.space.pos.m = 0,
@@ -47,7 +27,7 @@ LSMParams <- R6Class(
     latent.space.target = NULL,
     inverted.model = FALSE,
     tune = 0.1,
-
+    
     initialize = function(
       dimension = 2,
       latent.space.pos.m = 0,
@@ -67,7 +47,7 @@ LSMParams <- R6Class(
       self$inverted.model <- inverted.model
       self$tune <- tune
     },
-
+    
     create.component = function(n.nodes, edge.list, node.names) {
       return(LSMComponent$new(n.nodes, edge.list, node.names, self))
     }
@@ -91,7 +71,7 @@ LSMComponent <- R6Class(
     latent.space.target = NULL,
     inverted.model = FALSE,
     tune = 0.1,
-
+    
     initialize = function(n.nodes, edge.list, node.names, params) {
       self$dimension <- params$dimension
       self$latent.space.pos <- params$latent.space.pos
@@ -108,12 +88,12 @@ LSMComponent <- R6Class(
       self$n.edges <- nrow(edge.list) # QUESTION: Need this?
       private$mult.factor <- 2 * self$inverted.model - 1
     },
-
+    
     random.start = function() {
       "Generates a random latent positions to initiate the MCMC sampling. Places
       Them in the correct object field."
       n <- self$dimension * self$n.nodes
-      inits <- rnorm(n, 0, sqrt(self$latent.space.pos.v))
+      inits <- rnorm(n, self$latent.space.pos.m, sqrt(self$latent.space.pos.v))
       self$latent.space.pos <- matrix(inits, nrow = self$n.nodes)
       self$latent.space.target <- self$latent.space.pos
     },
@@ -131,18 +111,15 @@ LSMComponent <- R6Class(
     draw = function(outcome, residual.variance) {
       "Computes every step for each MCMC draw. MH step for latent space
       positions, Gibbs update for variance."
-
+      
       lsdim <- self$dimension
       
       latent.space.pos.hold <- self$latent.space.pos
       latent.space.pos.prop <- self$latent.space.pos
-      for (dd in 1:self$n.nodes) { # this is really slow, a lot of these steps can be vectorized
-        ## proposal for latent space positions.
+      for (dd in 1:self$n.nodes) {
         walk <- as.vector(rmvnorm(1, rep(0, lsdim), diag(self$tune^2, lsdim)))
         latent.space.pos.prop[dd, ] <- latent.space.pos.prop[dd, ] + walk
         
-        # FIXME: ratio computation function that uses vectorizaton
-        # computes density of proposal
         edge.list.rows <- row.list.maker(self$edge.list)
         llike.prop <- self$log.likelihood(
           outcome = outcome,
@@ -278,8 +255,8 @@ LSMComponent <- R6Class(
       latent.space.plot(pos, labels = self$node.names, ...)
     },
     procrustean.post = function(latent.space.pos,
-                                 latent.space.target,
-                                 recenter = TRUE) {       
+                                latent.space.target,
+                                recenter = TRUE) {       
       if (recenter) {
         latent.space.pos <- scale(latent.space.pos, scale = FALSE)
         latent.space.target <- scale(latent.space.target, scale = FALSE)
