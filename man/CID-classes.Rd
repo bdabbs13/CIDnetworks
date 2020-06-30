@@ -9,8 +9,6 @@
 \alias{COVARIATEcid}
 \alias{HBM}
 \alias{HBMcid}
-\alias{LSM}
-\alias{LSMcid}
 \alias{LVM}
 \alias{LVMcid}
 \alias{MMSBM}

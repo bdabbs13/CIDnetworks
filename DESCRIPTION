@@ -15,3 +15,24 @@ License: GPL (> 3)
 Depends: R (>= 3.0.0)
 Imports: mvtnorm, msm, methods, Rcpp (>= 0.11.0), igraph, numDeriv, MASS, R6
 LinkingTo: Rcpp
+RoxygenNote: 7.1.0
+Collate: 
+    'BETA-SR-reference.R'
+    'CID-basefunctions.R'
+    'CID-external.R'
+    'CID-gibbs.R'
+    'COV-reference.R'
+    'HBM-reference.R'
+    'plotting-pieces.R'
+    'LSM-reference.R'
+    'LVM-reference.R'
+    'MMSBM-reference.R'
+    'R6-CID-gibbs.R'
+    'R6-CIDnetwork.R'
+    'RcppExports.R'
+    'SBM-reference.R'
+    'SRa-reference.R'
+    'block-model-common.R'
+    'component-LSM.R'
+    'component-base-class.R'
+    'component-intercept.R'
