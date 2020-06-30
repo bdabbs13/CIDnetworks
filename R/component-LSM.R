@@ -1,14 +1,3 @@
-# QUESTION: latent.space.pos.m is never used, should we remove it?
-# NOTE: Exlcuded the following methods because they did not seem necessary
-#       - pieces
-#       - show
-#       - plot.network # it seems pretty generic, not specific to LSM
-#       - gibbs.full
-#       - gibbs.value
-#       - gibbs.mean # seems to be donein get.mean.component
-#       - gibbs.node.colors # didn't do anything specific for LSM anyway
-#       - reinitialize # the Params thing looks like the work-around
-
 # Interface Definition ---------------------------------------------------
 LSM <- function(
   dimension = 2,
@@ -30,14 +19,7 @@ LSMParams <- R6Class(
   classname = "LSMParams",
   inherit = BaseParams,
   public = list(
-    # NOTE: "outcome" is handled in CIDnetwork
-    # TODO: What parts of initialization depend on the outcome input?
-    # TODO: What should have initial values?
     dimension = 2,
-    # NOTE: arguments for target to be public vs. private in the COMPONENT
-    #         - in case the user wants to later access the target without access
-    #           to the input
-    # QUESTION: params that depend on other params might be able to defualt to NULL
     latent.space.pos = NULL,
     latent.space.pos.m = 0,
     latent.space.pos.v = 100,
@@ -90,7 +72,6 @@ LSMComponent <- R6Class(
     inverted.model = FALSE,
     tune = 0.1,
 
-    # TODO: What else should be initialized?
     initialize = function(n.nodes, edge.list, node.names, params) {
       self$dimension <- params$dimension
       self$latent.space.pos <- params$latent.space.pos
@@ -130,19 +111,9 @@ LSMComponent <- R6Class(
     draw = function(outcome, residual.variance) {
       "Computes every step for each MCMC draw. MH step for latent space
       positions, Gibbs update for variance."
-      # TODO: Update to be broken into private methods
-      # NOTES: This could be more self-documenting by breaking it into more
-      #        functions? It's also very slow looking. Not exploiting
-      #        vectorization.
-      
-      # dimension of latent space positions
-      # (why do we need a field called "dimension" then??)
+
       lsdim <- self$dimension
       
-      # TODO: large wrapper function for proposal and accept/reject
-      # TODO: Proposal function that uses vectorizaton
-      # initializing vector copies to store the previous positions and the
-      # proposal.
       latent.space.pos.hold <- self$latent.space.pos
       latent.space.pos.prop <- self$latent.space.pos
       for (dd in 1:self$n.nodes) { # this is really slow, a lot of these steps can be vectorized
@@ -161,7 +132,7 @@ LSMComponent <- R6Class(
         )
         ldens.pos.prop <- dnorm(
           x = latent.space.pos.prop[dd, ],
-          mean = 0,
+          mean = self$latent.space.pos.m,
           sd = sqrt(self$latent.space.pos.v),
           log = TRUE
         )
@@ -176,7 +147,7 @@ LSMComponent <- R6Class(
         )
         ldens.pos.orig <- dnorm(
           x = latent.space.pos.hold[dd, ],
-          mean = 0,
+          mean = self$latent.space.pos.m,
           sd = sqrt(self$latent.space.pos.v),
           log = TRUE
         )
@@ -211,7 +182,6 @@ LSMComponent <- R6Class(
       self$latent.space.pos.v <- 1 / g.draw # stores in field
     },
     
-    # TODO: Determine which variables should be output (ls.pos, v)
     create.output.list = function(total.draws) {
       init <- replicate(total.draws, matrix(NA, self$dimension, self$n.nodes))
       init.dimperm <- aperm(init, perm = 3:1)
@@ -254,8 +224,6 @@ LSMComponent <- R6Class(
       parameters[[2]] * edge.list.distance(parameters[[1]], rbind(self$edge.list[edges, ]))
     },    
     
-    # QUESTION: Do we want these functions here or should there be a separate
-    #           module for handling summary functions?
     gibbs.summary = function(gibbs.out) {
       "Report mean latent space position across thinned gibbs draws."
       lsp.all <- gibbs.output.list$component_output$latent.space.pos
