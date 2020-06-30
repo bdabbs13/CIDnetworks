@@ -13,8 +13,9 @@ BaseParams <- R6Class(
     #' Initialize Params object
     initialize = function(){},
     
-    #' TODO: Maybe add some documentation here for the edification of future 
-    #'   developers
+    #' Creates a component with the supplied parameters
+    #' 
+    #' The CIDnetwork object will call this function when initializing the model.
     #'
     #' @param n.nodes 
     #' @param edge.list 
