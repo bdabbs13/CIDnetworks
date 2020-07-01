@@ -41,7 +41,7 @@ LSMParams <- R6Class(
       self$dimension <- dimension
       self$latent.space.pos.m <- latent.space.pos.m
       
-      if (length(latent.space.pos.v.ab) != 1) {
+      if (length(latent.space.pos.v.ab) != 2) {
         stop("latent.space.pos.v.ab must have two elements c(alpha, beta) for",
              " each of the inv.gamma prior distribution parameters.")
       }
@@ -118,7 +118,7 @@ LSMComponent <- R6Class(
     random.start = function() {
       "Generates a random latent positions to initiate the MCMC sampling. Places
       Them in the correct object field."
-      if (!is.null(params$latent.space.pos)) {
+      if (is.null(self$latent.space.pos)) {
         n <- self$dimension * self$n.nodes
         inits <- rnorm(n, self$latent.space.pos.m, sqrt(self$latent.space.pos.v))
         self$latent.space.pos <- matrix(inits, nrow = self$n.nodes)
@@ -218,8 +218,8 @@ LSMComponent <- R6Class(
     
     
     update.output.list = function(gibbs.output.list, draw) {
-      gibbs.output.list$component_output$latent.space.pos[draw, , ] = self$latent.space.pos
-      gibbs.output.list$component_output$latent.space.pos.v[draw] = self$latent.space.pos.v
+      gibbs.output.list$component_output$latent.space.pos[draw, , ] <- self$latent.space.pos
+      gibbs.output.list$component_output$latent.space.pos.v[draw] <- self$latent.space.pos.v
     },
     
     get.mean.component = function(gibbs.output.list) {
@@ -244,8 +244,6 @@ LSMComponent <- R6Class(
       "Returns latent distance between nodes multiplied by multiplicative factor.
     parameters argument accepts list with latent.space.pos in first position,
     latent.space.v in second position, and multiplicative factor in third."
-      # NOTES: this seems to be an error, parameters[[2]] from pieces() refers to
-      #        latent.space.pos.v rather than mult.factor (which is in position 3)
       parameters[[2]] * edge.list.distance(parameters[[1]], rbind(self$edge.list[edges, ]))
     },    
     
@@ -253,8 +251,8 @@ LSMComponent <- R6Class(
       "Report mean latent space position across thinned gibbs draws."
       lsp.all <- gibbs.output.list$component_output$latent.space.pos
       # take mean across draws and reshape into matrix with nodes as rows
-      output <- matrix(apply(lsp.all, c(2, 3), mean), nrow = n.nodes)
-      rownames(output) <- node.names
+      output <- matrix(apply(lsp.all, c(2, 3), mean), nrow = self$n.nodes)
+      rownames(output) <- self$node.names
       colnames(output) <- paste0("pos", 1:ncol(output))
       return(output)
     },
@@ -277,11 +275,13 @@ LSMComponent <- R6Class(
   # Private Methods and Attributes
   private = list(
     mult.factor = NA,
+    
     plot = function(pos = self$latent.space.pos, ...) {
       "Plots the latent space positions. pos argument accepts latent space
        position matrix. Defaults to latent space position already in class."
       latent.space.plot(pos, labels = self$node.names, ...)
     },
+    
     procrustean.post = function(latent.space.pos,
                                 latent.space.target,
                                 recenter = TRUE) {       
@@ -290,10 +290,10 @@ LSMComponent <- R6Class(
         latent.space.target <- scale(latent.space.target, scale = FALSE)
       }
       
-      projection = t(latent.space.target) %*% latent.space.pos
+      projection <- t(latent.space.target) %*% latent.space.pos
       ssZ = svd(projection)
-      transformation = ssZ$v %*% t(ssZ$u)
-      latent.space.pos = latent.space.pos %*% transformation
+      transformation <- ssZ$v %*% t(ssZ$u)
+      latent.space.pos <- latent.space.pos %*% transformation
       
       return(latent.space.pos)
     }

@@ -1,6 +1,7 @@
 # R6 Testing
 
 library(CIDnetworks)
+library(mvtnorm)
 
 # cluster means
 theta <- 2*pi/3 * 0:2
@@ -14,7 +15,11 @@ prob <- plogis(2 - sqrt(as.matrix(dist(samples))))
 adjmat <- apply(prob, 1, sapply, rbinom, n = 1, size = 1)
 
 # FULL GIBBS TEST
-big_test_net = CIDnetwork$new(adjmat, components = list(INTERCEPT(), LSM(dimension = 2)))
+components <- list(
+  INTERCEPT(intercept.m = 2, intercept = 2, intercept.v = 0.001), # fixed intercept
+  LSM(dimension = 2)
+)
+big_test_net = CIDnetwork$new(adjmat, components = components)
 test_gibbs <- CIDGibbs$new(
   cid.network = big_test_net,
   draws = 1000,
