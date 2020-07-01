@@ -10,8 +10,8 @@ SBM <- function(
   membership = NULL
 ) {
   return(SBMParams$new(n.groups, block.matrix.m, block.matrix.v,
-                       membership.a, symmetric.b, block.matrix,
-                       membership))
+                       membership.a, symmetric.b, strong.block,
+                       block.matrix, membership))
 }
 
 # Param Definition -------------------------------------------------------
@@ -52,8 +52,8 @@ SBMParams <- R6Class(
       
       # have to deal with shape in the Component class when we know n.nodes
       self$membership.a <- membership.a
-      self$symmetric.b = symmetric.b
-      self$strong.block = strong.block
+      self$symmetric.b <- symmetric.b
+      self$strong.block <- strong.block
       
       if (!is.null(block.matrix)) {
         if (!all(dim(block.matrix) == c(n.groups, n.groups))) {
@@ -89,6 +89,7 @@ SBMComponent <- R6Class(
     membership = NULL,
     n.nodes = NA,
     edge.list = NULL,
+    edge.list.rows = NULL,
     node.names = NULL,
     
     initialize = function(n.nodes, edge.list, node.names, params) {
@@ -96,9 +97,9 @@ SBMComponent <- R6Class(
       self$block.matrix.m <- params$block.matrix.m
       self$block.matrix.v <- params$block.matrix.v
       
-      if (is.null(membership.a)) {
-        membership.a = matrix(1, nrow = n.nodes, ncol = params$n.groups)
-      } else if (!all(dim(membership.a) == c(n.nodes, params$n.groups))) {
+      if (is.null(params$membership.a)) {
+        params$membership.a = matrix(1, nrow = n.nodes, ncol = params$n.groups)
+      } else if (!all(dim(params$membership.a) == c(n.nodes, params$n.groups))) {
         stop("membership.a must be matrix with shape nrow = n.nodes, ncol = n.groups")
       }
       self$membership.a <- params$membership.a
@@ -113,6 +114,7 @@ SBMComponent <- R6Class(
       
       self$n.nodes <- n.nodes
       self$edge.list <- edge.list
+      self$edge.list.rows <- row.list.maker(edge.list)
       self$node.names <- node.names
     },
     
@@ -134,13 +136,13 @@ SBMComponent <- R6Class(
       
       # QUESTION: does not use membership.a prior parameters, isn't beta distributed?
       if (is.null(self$block.matrix)) {
-        block.matrix <- matrix(rnorm(n.groups * n.groups, 0, 1), nrow = n.groups)
+        block.matrix <- matrix(rnorm(self$n.groups * self$n.groups, 0, 1), nrow = self$n.groups)
       }
-      if (strong.block) {
+      if (self$strong.block) {
         pivots <- sapply(1:n.groups, function(kk) {
           max(c(block.matrix[kk, -kk], block.matrix[-kk, kk]))
         })
-        diag(block.matrix) <- pivots + rexp(n.groups)
+        diag(block.matrix) <- pivots + rexp(self$n.groups)
       }
       self$block.matrix <- block.matrix
     },
@@ -163,18 +165,17 @@ SBMComponent <- R6Class(
       
       # Drawing membership vector
       b.memb <- self$membership
-      if (verbose > 1) print(b.memb)
       
       # TODO: Should probably be a private method
       get_log_posterior <- function(gg, node) {
         b.memb[node] <- gg
         ## BD: We don't need to calculate the likelihood for all edges, just the ones
-        sender_node <- b.memb[edge.list[edge.list.rows[[node]], 1]]
-        receiver_node <- b.memb[edge.list[edge.list.rows[[node]], 2]] - 1
-        piece <- block.matrix[sender_node + receiver_node * n.groups]
+        sender_node <- b.memb[self$edge.list[self$edge.list.rows[[node]], 1]]
+        receiver_node <- b.memb[self$edge.list[self$edge.list.rows[[node]], 2]] - 1
+        piece <- self$block.matrix[sender_node + receiver_node * self$n.groups]
         
-        log_prior <- log(membership.a[node, gg])
-        log_likelihood <- sum(dnorm(outcome[edge.list.rows[[node]]],
+        log_prior <- log(self$membership.a[node, gg])
+        log_likelihood <- sum(dnorm(outcome[self$edge.list.rows[[node]]],
                                     piece, sqrt(residual.variance),
                                     log = TRUE
         ))
@@ -191,13 +192,12 @@ SBMComponent <- R6Class(
           b.memb[node] <- sample(1:self$n.groups, 1, prob = exp(log.pp.vec))
         }
       }
-      if (verbose > 1) print(b.memb)
       self$membership <- b.memb
       
       # Drawing block-block tie probs.
       membership.pairs <- cbind(
-        b.memb[edge.list[, 1]],
-        b.memb[edge.list[, 2]]
+        b.memb[self$edge.list[, 1]],
+        b.memb[self$edge.list[, 2]]
       )
       for (ss in 1:self$n.groups) {
         for (rr in 1:self$n.groups) {
@@ -250,7 +250,7 @@ SBMComponent <- R6Class(
         }
         
         self$block.matrix[ss, rr] <- output
-        if (symmetric.b) {
+        if (self$symmetric.b) {
           self$block.matrix[rr, ss] <- output
         }
       }
@@ -258,10 +258,10 @@ SBMComponent <- R6Class(
     },
     
     create.output.list = function(total.draws) {
-      init <- replicate(total.draws, matrix(NA, self$n.groups, self$n.nodes))
+      init <- replicate(total.draws, matrix(NA, self$n.groups, self$n.groups))
       init.dimperm <- aperm(init, perm = 3:1)
       return(list(
-        black.matrix = init.dimperm,
+        block.matrix = init.dimperm,
         membership = matrix(NA, nrow = total.draws, ncol = self$n.nodes)
       ))
     },
