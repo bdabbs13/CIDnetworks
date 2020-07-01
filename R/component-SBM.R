@@ -92,19 +92,19 @@ SBMComponent <- R6Class(
     node.names = NULL,
     
     initialize = function(n.nodes, edge.list, node.names, params) {
-      self$n.groups <- n.groups
-      self$block.matrix.m <- block.matrix.m
-      self$block.matrix.v <- block.matrix.v
+      self$n.groups <- params$n.groups
+      self$block.matrix.m <- params$block.matrix.m
+      self$block.matrix.v <- params$block.matrix.v
       
       if (is.null(membership.a)) {
-        membership.a = matrix(1, nrow = n.nodes, ncol = n.groups)
-      } else if (!all(dim(membership.a) == c(n.nodes, n.groups))) {
+        membership.a = matrix(1, nrow = n.nodes, ncol = params$n.groups)
+      } else if (!all(dim(membership.a) == c(n.nodes, params$n.groups))) {
         stop("membership.a must be matrix with shape nrow = n.nodes, ncol = n.groups")
       }
-      self$membership.a <- membership.a
-      self$symmetric.b <- symmetric.b
-      self$strong.block <- strong.block
-      self$block.matrix <- block.matrix
+      self$membership.a <- params$membership.a
+      self$symmetric.b <- params$symmetric.b
+      self$strong.block <- params$strong.block
+      self$block.matrix <- params$block.matrix
       
       if (!is.null(membership) & length(membership) != n.nodes) {
         stop("membership must be a numeric vector with length = n.nodes")
