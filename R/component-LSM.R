@@ -104,7 +104,7 @@ LSMParams <- R6Class(
     latent.space.target = NULL,
     inverted.model = FALSE,
     tune = 0.1,
-
+    
     initialize = function(
       dimension = 2,
       latent.space.pos.m = 0,
@@ -117,14 +117,22 @@ LSMParams <- R6Class(
     ) {
       self$dimension <- dimension
       self$latent.space.pos.m <- latent.space.pos.m
+      
+      if (length(latent.space.pos.v.ab) != 2) {
+        stop("latent.space.pos.v.ab must have two elements c(alpha, beta) for",
+             " each of the inv.gamma prior distribution parameters.")
+      }
       self$latent.space.pos.v.ab <- latent.space.pos.v.ab
+      
+      # handle these in LSMComponent once we have n.nodes
       self$latent.space.pos <- latent.space.pos
-      self$latent.space.pos.v <- latent.space.pos.v
       self$latent.space.target <- latent.space.target
+      
+      self$latent.space.pos.v <- latent.space.pos.v
       self$inverted.model <- inverted.model
       self$tune <- tune
     },
-
+    
     create.component = function(n.nodes, edge.list, node.names) {
       return(LSMComponent$new(n.nodes, edge.list, node.names, self))
     }
@@ -140,7 +148,6 @@ LSMComponent <- R6Class(
     n.nodes = NA,
     edge.list = NULL,
     node.names = NULL,
-    n.edges = NA, # QUESTION: Need this?
     latent.space.pos = NULL,
     latent.space.pos.m = 0,
     latent.space.pos.v = 100,
@@ -148,31 +155,52 @@ LSMComponent <- R6Class(
     latent.space.target = NULL,
     inverted.model = FALSE,
     tune = 0.1,
-
+    
     initialize = function(n.nodes, edge.list, node.names, params) {
       self$dimension <- params$dimension
-      self$latent.space.pos <- params$latent.space.pos
       self$latent.space.pos.m <- params$latent.space.pos.m
       self$latent.space.pos.v <- params$latent.space.pos.v
       self$latent.space.pos.v.ab <- params$latent.space.pos.v.ab
-      self$latent.space.target <- params$latent.space.target
       self$inverted.model <- params$inverted.model
       self$tune <- params$tune
+      
+      if (!is.null(params$latent.space.pos)) {
+        if (all(dim(params$latent.space.pos) != c(n.nodes, params$dimension))) {
+          stop("latent.space.pos must be shape nrow = n.nodes, nrow = dimension")
+        } else {
+          if (is.null(params$latent.space.pos)) {
+            self$latent.space.target <- params$latent.space.pos
+          }
+          self$latent.space.pos <- params$latent.space.pos
+        }
+      }
+      
+      if (!is.null(params$latent.space.target)) {
+        if (all(dim(params$latent.space.target) != c(n.nodes, params$dimension))) {
+          stop("latent.space.target must be shape nrow = n.nodes, nrow = dimension")
+        } else {
+          if (is.null(params$latent.space.pos)) {
+            self$latent.space.pos <- params$latent.space.target
+          }
+          self$latent.space.target <- params$latent.space.target
+        }
+      }
       
       self$n.nodes <- n.nodes
       self$edge.list <- edge.list
       self$node.names <- node.names
-      self$n.edges <- nrow(edge.list) # QUESTION: Need this?
       private$mult.factor <- 2 * self$inverted.model - 1
     },
-
+    
     random.start = function() {
       "Generates a random latent positions to initiate the MCMC sampling. Places
       Them in the correct object field."
-      n <- self$dimension * self$n.nodes
-      inits <- rnorm(n, self$latent.space.pos.m, sqrt(self$latent.space.pos.v))
-      self$latent.space.pos <- matrix(inits, nrow = self$n.nodes)
-      self$latent.space.target <- self$latent.space.pos
+      if (is.null(self$latent.space.pos)) {
+        n <- self$dimension * self$n.nodes
+        inits <- rnorm(n, self$latent.space.pos.m, sqrt(self$latent.space.pos.v))
+        self$latent.space.pos <- matrix(inits, nrow = self$n.nodes)
+        self$latent.space.target <- self$latent.space.pos
+      }
     },
     
     log.likelihood = function(outcome,
@@ -188,7 +216,7 @@ LSMComponent <- R6Class(
     draw = function(outcome, residual.variance) {
       "Computes every step for each MCMC draw. MH step for latent space
       positions, Gibbs update for variance."
-
+      
       lsdim <- self$dimension
       
       latent.space.pos.hold <- self$latent.space.pos
@@ -267,8 +295,8 @@ LSMComponent <- R6Class(
     
     
     update.output.list = function(gibbs.output.list, draw) {
-      gibbs.output.list$component_output$latent.space.pos[draw, , ] = self$latent.space.pos
-      gibbs.output.list$component_output$latent.space.pos.v[draw] = self$latent.space.pos.v
+      gibbs.output.list$component_output$latent.space.pos[draw, , ] <- self$latent.space.pos
+      gibbs.output.list$component_output$latent.space.pos.v[draw] <- self$latent.space.pos.v
     },
     
     get.mean.component = function(gibbs.output.list) {
@@ -293,8 +321,6 @@ LSMComponent <- R6Class(
       "Returns latent distance between nodes multiplied by multiplicative factor.
     parameters argument accepts list with latent.space.pos in first position,
     latent.space.v in second position, and multiplicative factor in third."
-      # NOTES: this seems to be an error, parameters[[2]] from pieces() refers to
-      #        latent.space.pos.v rather than mult.factor (which is in position 3)
       parameters[[2]] * edge.list.distance(parameters[[1]], rbind(self$edge.list[edges, ]))
     },    
     
@@ -302,8 +328,8 @@ LSMComponent <- R6Class(
       "Report mean latent space position across thinned gibbs draws."
       lsp.all <- gibbs.output.list$component_output$latent.space.pos
       # take mean across draws and reshape into matrix with nodes as rows
-      output <- matrix(apply(lsp.all, c(2, 3), mean), nrow = n.nodes)
-      rownames(output) <- node.names
+      output <- matrix(apply(lsp.all, c(2, 3), mean), nrow = self$n.nodes)
+      rownames(output) <- self$node.names
       colnames(output) <- paste0("pos", 1:ncol(output))
       return(output)
     },
@@ -326,23 +352,25 @@ LSMComponent <- R6Class(
   # Private Methods and Attributes
   private = list(
     mult.factor = NA,
+    
     plot = function(pos = self$latent.space.pos, ...) {
       "Plots the latent space positions. pos argument accepts latent space
        position matrix. Defaults to latent space position already in class."
       latent.space.plot(pos, labels = self$node.names, ...)
     },
+    
     procrustean.post = function(latent.space.pos,
-                                 latent.space.target,
-                                 recenter = TRUE) {       
+                                latent.space.target,
+                                recenter = TRUE) {       
       if (recenter) {
         latent.space.pos <- scale(latent.space.pos, scale = FALSE)
         latent.space.target <- scale(latent.space.target, scale = FALSE)
       }
       
-      projection = t(latent.space.target) %*% latent.space.pos
+      projection <- t(latent.space.target) %*% latent.space.pos
       ssZ = svd(projection)
-      transformation = ssZ$v %*% t(ssZ$u)
-      latent.space.pos = latent.space.pos %*% transformation
+      transformation <- ssZ$v %*% t(ssZ$u)
+      latent.space.pos <- latent.space.pos %*% transformation
       
       return(latent.space.pos)
     }
