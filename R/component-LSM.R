@@ -40,10 +40,18 @@ LSMParams <- R6Class(
     ) {
       self$dimension <- dimension
       self$latent.space.pos.m <- latent.space.pos.m
+      
+      if (length(latent.space.pos.v.ab) != 1) {
+        stop("latent.space.pos.v.ab must have two elements c(alpha, beta) for",
+             " each of the inv.gamma prior distribution parameters.")
+      }
       self$latent.space.pos.v.ab <- latent.space.pos.v.ab
+      
+      # handle these in LSMComponent once we have n.nodes
       self$latent.space.pos <- latent.space.pos
-      self$latent.space.pos.v <- latent.space.pos.v
       self$latent.space.target <- latent.space.target
+      
+      self$latent.space.pos.v <- latent.space.pos.v
       self$inverted.model <- inverted.model
       self$tune <- tune
     },
@@ -63,7 +71,6 @@ LSMComponent <- R6Class(
     n.nodes = NA,
     edge.list = NULL,
     node.names = NULL,
-    n.edges = NA, # QUESTION: Need this?
     latent.space.pos = NULL,
     latent.space.pos.m = 0,
     latent.space.pos.v = 100,
@@ -74,28 +81,49 @@ LSMComponent <- R6Class(
     
     initialize = function(n.nodes, edge.list, node.names, params) {
       self$dimension <- params$dimension
-      self$latent.space.pos <- params$latent.space.pos
       self$latent.space.pos.m <- params$latent.space.pos.m
       self$latent.space.pos.v <- params$latent.space.pos.v
       self$latent.space.pos.v.ab <- params$latent.space.pos.v.ab
-      self$latent.space.target <- params$latent.space.target
       self$inverted.model <- params$inverted.model
       self$tune <- params$tune
+      
+      if (!is.null(params$latent.space.pos)) {
+        if (all(dim(params$latent.space.pos) != c(n.nodes, params$dimension))) {
+          stop("latent.space.pos must be shape nrow = n.nodes, nrow = dimension")
+        } else {
+          if (is.null(params$latent.space.pos)) {
+            self$latent.space.target <- params$latent.space.pos
+          }
+          self$latent.space.pos <- params$latent.space.pos
+        }
+      }
+      
+      if (!is.null(params$latent.space.target)) {
+        if (all(dim(params$latent.space.target) != c(n.nodes, params$dimension))) {
+          stop("latent.space.target must be shape nrow = n.nodes, nrow = dimension")
+        } else {
+          if (is.null(params$latent.space.pos)) {
+            self$latent.space.pos <- params$latent.space.target
+          }
+          self$latent.space.target <- params$latent.space.target
+        }
+      }
       
       self$n.nodes <- n.nodes
       self$edge.list <- edge.list
       self$node.names <- node.names
-      self$n.edges <- nrow(edge.list) # QUESTION: Need this?
       private$mult.factor <- 2 * self$inverted.model - 1
     },
     
     random.start = function() {
       "Generates a random latent positions to initiate the MCMC sampling. Places
       Them in the correct object field."
-      n <- self$dimension * self$n.nodes
-      inits <- rnorm(n, self$latent.space.pos.m, sqrt(self$latent.space.pos.v))
-      self$latent.space.pos <- matrix(inits, nrow = self$n.nodes)
-      self$latent.space.target <- self$latent.space.pos
+      if (!is.null(params$latent.space.pos)) {
+        n <- self$dimension * self$n.nodes
+        inits <- rnorm(n, self$latent.space.pos.m, sqrt(self$latent.space.pos.v))
+        self$latent.space.pos <- matrix(inits, nrow = self$n.nodes)
+        self$latent.space.target <- self$latent.space.pos
+      }
     },
     
     log.likelihood = function(outcome,
