@@ -87,7 +87,6 @@ SBMComponent <- R6Class(
     strong.block = FALSE,
     block.matrix = NULL,
     membership = NULL,
-    group.pairs = "matrix",
     n.nodes = NA,
     edge.list = NULL,
     node.names = NULL,
