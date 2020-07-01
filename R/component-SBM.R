@@ -1,4 +1,84 @@
 # Interface Definition ---------------------------------------------------
+#' Specify SBM component for a CIDnetwork model
+#'
+#' @description
+#' Specify the prior mean and variance for the block-block tie matrix, the
+#' multinomial prior on the membership vector, and their starting values for the
+#' SBM component of your CIDnetwork model. Returns an `SBMParams` object that
+#' stores the your supplied arguments. This output should be passed as part of a
+#' `list` of other components to the `components` argument of the
+#' `CIDnetwork$new()` initialization method to define your model.
+#' 
+#' @details
+#' In a stochastic block model (SBM), the probability of observing a network tie
+#' between two nodes depends on which groups (called blocks) the nodes are
+#' members of, and the relationship between the groups. Nodes in the same block
+#' are more likely to have a tie than nodes in different block; and some times
+#' certain pairs of blocks are more likely to have nodes that share ties than
+#' other pairs.
+#' 
+#' The model is written in notation as
+#' \deqn{Y_{ij} \sim Bernoulli(g_i^T B g_j)}
+#' \deqn{g_i \sim Multinomial(p_i)}
+#' \deqn{B_{\ell m} \sim Beta(\mu_{\ell m}, \nu_{\ell m})}
+#' 
+#' This package uses the mean-variance parameterization to specify the prior on
+#' the block-block tie matrix.
+#' 
+#' The variables in this model correspond to the following arguments for this
+#' function
+#' \itemize{
+#'   \item \eqn{g_i} is the group/block membership vector. You can pass the
+#'   initial value in the `membership` argument.
+#'   \item \eqn{p_i} is the prior for the group/block membership vector which is
+#'   the `membership.a` argument. In this package, the prior can be specified
+#'   for each node.
+#'   \item \eqn{B_{\ell m}} is the block-block tie matrix. You can pass the
+#'   initial value in the `block.matrix` argument.
+#'   \item \eqn{\mu_{\ell m}} corresponds to the `block.matrix.m` argument.
+#'   \item \eqn{\nu_{\ell m}} corresponds to the `block.matrix.v` argument.
+#' }
+#' 
+#' The block.matrix priors can be used to incorporate information about how
+#' likely inter-group ties are.
+#'   
+#' @param n.groups Integer scalar specifying the number of groups/blocks.
+#'   (default = 2)
+#' @param block.matrix.m Numeric matrix of size `G X G` specifying the mean of
+#'   the beta prior distribution for each block-block tie probability. `G` is
+#'   the number of groups/blocks. (default = matrix of all 0s)
+#' @param block.matrix.v Numeric matrix of size `G X G` specifying the variance
+#'   of the beta prior distribution for each block-block tie probability. `G` is
+#'   the number of groups/blocks. (default = matrix of all 1000s; "weak" prior,
+#'   nearly uniform)
+#' @param membership.a Numeric matrix of size `N X G` specifying the prior
+#'   probability for each node to be a member of each group. `N` is the number
+#'   of nodes and `G` is the number of groups/blocks.  Rows do not need to sum
+#'   to 1, as MCMC takes care of normalization. However, it is highly
+#'   recommended to specify rows that sum to 1 if not using a uniform
+#'   probability (like the default) so that you are fully aware of the
+#'   normalized prior probability you are specifying. (default = matrix of all
+#'   1s)
+#' @param symmetric.b Logical scalar, if `TRUE`, will force `block.matrix` to be
+#'   symmetric. Ensures that group sending-receiving probabilities are
+#'   identical. (default = TRUE)
+#' @param stong.block Logical scalar, if `TRUE`, will force `block.matrix` to
+#'   have larger diagonal entries than off-diagonal. Ensures that intra-group
+#'   tie probabilities are strong than ties with nodes in other groups. (default
+#'   = FALSE)
+#' @param block.matrix Numeric matrix of size `G X G` specifying the initial
+#'   block-block tie probability matrix. `G` is the number of groups/blocks.
+#'   (default = NULL, which randomly generates the matrix from the prior)
+#' @param membership Numeric vector of length `N` specifying the initial value
+#'   for the group/block membership vector. `N` is the number of nodes. (default
+#'   = NULL, which randomly generates the vector from the prior)
+#'
+#' @return An `SBMParams` object that can be fed in a list of other components
+#'   to the `components` argument of `CIDnetwork$new()`.
+#' @export
+#'
+#' TODO: refer to old examples for ideas
+#' @examples
 SBM <- function(
   n.groups = 2,
   block.matrix.m = matrix(0, nrow = n.groups, ncol = n.groups),

@@ -15,8 +15,6 @@
 \alias{LVMcid}
 \alias{MMSBM}
 \alias{MMSBMcid}
-\alias{SBM}
-\alias{SBMcid}
 \alias{SR}
 \alias{SRcid}
 
